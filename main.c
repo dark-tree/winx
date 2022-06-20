@@ -19,8 +19,8 @@ void wait() {
 	frames++;
 
 	if (t - t0 >= 5.0) {
-		GLfloat seconds = t - t0;
-		GLfloat fps = frames / seconds;
+		float seconds = t - t0;
+		float fps = frames / seconds;
 		printf("%d frames in %3.1f seconds = %6.3f FPS\n", frames, seconds, fps);
 		t0 = t;
 		frames = 0;

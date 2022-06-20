@@ -2,4 +2,4 @@
 
 set -x
 
-gcc main.c -lGL -lX11 -o main && ./main
+gcc -g -O0 main.c -lGL -lX11 -o main && ./main

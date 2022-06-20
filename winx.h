@@ -34,6 +34,7 @@
 typedef void (*WinxMouseEventHandle)(int, int);
 typedef void (*WinxButtonEventHandle)(int, int);
 typedef void (*WinxKeybordEventHandle)(int, int);
+typedef void (*WinxScrollEventHandle)(int);
 typedef void (*WinxCloseEventHandle)(void);
 
 /// set a window hint, has to be called prior to winxOpen()
@@ -63,6 +64,9 @@ void winxSetButtonEventHandle(WinxButtonEventHandle handle);
 /// set the handle for keybord events, requires an open window
 void winxSetKeybordEventHandle(WinxKeybordEventHandle handle);
 
+/// set the handle for mouse scroll, requires an open window
+void winxSetScrollEventHandle(WinxScrollEventHandle handle);
+
 /// set the handle for window close button, requires an open window
 void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 
@@ -70,7 +74,7 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 #define WINX_RELEASED 0
 
 /// hint keys
-#define WINX_HINT_VSYNC        0x01 // TODO GLX
+#define WINX_HINT_VSYNC        0x01
 #define WINX_HINT_RED_BITS     0x02
 #define WINX_HINT_GREEN_BITS   0x03
 #define WINX_HINT_BLUE_BITS    0x04
@@ -86,8 +90,36 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 
 #if defined(__unix__) || defined(__linux__)
 #	define WINX_GLX
+
+#	define WXK_SPACE ' '
+#	define WXK_TAB '\t'
+#	define WXK_ESC XK_Escape
+#	define WXK_ENTER XK_Return
+#	define WXK_BACK XK_BackSpace
+#	define WXK_UP XK_Up
+#	define WXK_DOWN XK_Down
+#	define WXK_LEFT XK_Left
+#	define WXK_RIGHT XK_Right
+#	define WXB_LEFT Button1
+#	define WXB_CENTER Button2
+#	define WXB_RIGHT Button3
+
 #elif defined(_WIN32) || defined(_WIN64)
 #	define WINX_WINAPI
+
+#	define WXK_SPACE ' '
+#	define WXK_TAB '\t'
+#	define WXK_ESC VK_ESCAPE
+#	define WXK_ENTER VK_RETURN
+#	define WXK_BACK VK_BACK
+#	define WXK_UP VK_UP
+#	define WXK_DOWN VK_DOWN
+#	define WXK_LEFT VK_LEFT
+#	define WXK_RIGHT VK_RIGHT
+#	define WXB_LEFT 1
+#	define WXB_CENTER 2
+#	define WXB_RIGHT 3
+
 #endif
 
 #if defined(WINX_IMPLEMENT)
@@ -96,6 +128,7 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 void WinxDummyMouseEventHandle(int x, int y) {}
 void WinxDummyButtonEventHandle(int type, int button) {}
 void WinxDummyKeybordEventHandle(int type, int key) {}
+void WinxDummyScrollEventHandle(int scroll) {}
 void WinxDummyCloseEventHandle() {}
 
 // hints
@@ -171,6 +204,11 @@ void winxHint(int hint, int value) {
 #include <X11/keysym.h>
 #include <GL/glx.h>
 
+// copied from glxext.h
+typedef int ( *PFNGLXSWAPINTERVALMESAPROC) (unsigned int interval);
+
+PFNGLXSWAPINTERVALMESAPROC glXSwapIntervalMESA;
+
 typedef struct {
 	Display* display;
 	Window window;
@@ -180,6 +218,7 @@ typedef struct {
 	WinxMouseEventHandle mouse;
 	WinxButtonEventHandle button;
 	WinxKeybordEventHandle keyboard;
+	WinxScrollEventHandle scroll;
 	WinxCloseEventHandle close;
 } WinxHandle;
 
@@ -192,11 +231,12 @@ bool winxOpen(int width, int height, const char* title) {
 	winx->button = WinxDummyButtonEventHandle;
 	winx->mouse = WinxDummyMouseEventHandle;
 	winx->keyboard = WinxDummyKeybordEventHandle;
+	winx->scroll = WinxDummyScrollEventHandle;
 	winx->close = WinxDummyCloseEventHandle;
 
 	// get display handle
 	winx->display = XOpenDisplay(NULL);
-	if( !winx->display ) {
+	if (!winx->display) {
 		__winx_msg = (char*) "XOpenDisplay: Failed to acquire display handle!";
 		return false;
 	}
@@ -241,7 +281,7 @@ bool winxOpen(int width, int height, const char* title) {
 
 	// create GLX context
 	winx->context = glXCreateContext(winx->display, info, NULL, 1);
-	if( !winx->context ) {
+	if (!winx->context) {
 		__winx_msg = (char*) "glXCreateContext: Failed to create GLX context!";
 		return false;
 	}
@@ -255,6 +295,13 @@ bool winxOpen(int width, int height, const char* title) {
 	// needed to handle the close button
 	winx->WM_DELETE_WINDOW = XInternAtom(winx->display, "WM_DELETE_WINDOW", false);
 	XSetWMProtocols(winx->display, winx->window, &(winx->WM_DELETE_WINDOW), 1);
+
+	// try setting vsync
+	glXSwapIntervalMESA = (PFNGLXSWAPINTERVALMESAPROC) glXGetProcAddress("glXSwapIntervalMESA");
+
+	if (glXSwapIntervalMESA && __winx_hint_vsync) {
+		glXSwapIntervalMESA(__winx_hint_vsync);
+	}
 
 	return true;
 }
@@ -282,6 +329,16 @@ void winxPollEvents() {
 				break;
 
 			case ButtonPress:
+				if (event.xbutton.button == Button4) {
+					winx->scroll(1);
+					break;
+				}
+
+				if (event.xbutton.button == Button5) {
+					winx->scroll(-1);
+					break;
+				}
+
 				winx->button(WINX_PRESSED, event.xbutton.button);
 				break;
 
@@ -324,6 +381,10 @@ void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
 
 void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
 	if (winx != NULL) winx->keyboard = handle;
+}
+
+void winxSetScrollEventHandle(WinxScrollEventHandle handle) {
+	if (winx != NULL) winx->scroll = handle;
 }
 
 void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
@@ -375,6 +436,7 @@ typedef struct {
 	WinxMouseEventHandle mouse;
 	WinxButtonEventHandle button;
 	WinxKeybordEventHandle keyboard;
+	WinxScrollEventHandle scroll;
 	WinxCloseEventHandle close;
 } WinxHandle;
 
@@ -411,19 +473,31 @@ LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 			break;
 
 		case WM_LBUTTONDOWN:
-			winx->button(WINX_PRESSED, 0);
+			winx->button(WINX_PRESSED, WXB_LEFT);
 			break;
 
 		case WM_LBUTTONUP:
-			winx->button(WINX_RELEASED, 0);
+			winx->button(WINX_RELEASED, WXB_LEFT);
+			break;
+
+		case WM_MBUTTONDOWN:
+			winx->button(WINX_PRESSED, WXB_CENTER);
+			break;
+
+		case WM_MBUTTONUP:
+			winx->button(WINX_RELEASED, WXB_CENTER);
 			break;
 
 		case WM_RBUTTONDOWN:
-			winx->button(WINX_PRESSED, 1);
+			winx->button(WINX_PRESSED, WXB_RIGHT);
 			break;
 
 		case WM_RBUTTONUP:
-			winx->button(WINX_RELEASED, 1);
+			winx->button(WINX_RELEASED, WXB_RIGHT);
+			break;
+
+		case WM_MOUSEWHEEL:
+			winx->scroll(GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA);
 			break;
 
 		case WM_CLOSE:
@@ -446,6 +520,7 @@ bool winxOpen(int width, int height, const char* title) {
 	winx->button = WinxDummyButtonEventHandle;
 	winx->mouse = WinxDummyMouseEventHandle;
 	winx->keyboard = WinxDummyKeybordEventHandle;
+	winx->scroll = WinxDummyScrollEventHandle;
 	winx->close = WinxDummyCloseEventHandle;
 
 	// register window class
@@ -650,6 +725,10 @@ void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
 
 void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
 	if (winx != NULL) winx->keyboard = handle;
+}
+
+void winxSetScrollEventHandle(WinxScrollEventHandle handle) {
+	if (winx != NULL) winx->scroll = handle;
 }
 
 void winxSetCloseEventHandle(WinxCloseEventHandle handle) {

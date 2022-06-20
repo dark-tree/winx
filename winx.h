@@ -467,7 +467,7 @@ bool winxOpen(int width, int height, const char* title) {
 	wcex.hIconSm = NULL;
 
 	if (!RegisterClassEx(&wcex)) {
-		__winx_msg = (char*) "RegisterClassExW: Failed to register window class!";
+		__winx_msg = (char*) "RegisterClassEx: Failed to register window class!";
 		return false;
 	}
 
@@ -475,20 +475,20 @@ bool winxOpen(int width, int height, const char* title) {
 	HDC fakeDeviceContext;
 	HGLRC fakeRenderContext;
 
-	// create fake window to get WGL context
+	// create temporary window to get WGL context
 	fakeHndl = CreateWindow(clazz, "WINX", WS_OVERLAPPEDWINDOW, 0, 0, 1, 1, NULL, NULL, hinstance, NULL);
 	if (!fakeHndl) {
-		__winx_msg = (char*) "CreateWindowW: Failed to create fake window!";
+		__winx_msg = (char*) "CreateWindow: Failed to create temporary window!";
 		return false;
 	}
 
 	fakeDeviceContext = GetDC(fakeHndl);
 	if (!fakeDeviceContext) {
-		__winx_msg = (char*) "GetDC: Failed to create fake device context!";
+		__winx_msg = (char*) "GetDC: Failed to create temporary device context!";
 		return false;
 	}
 
-	int __winx_hint_color_bits = __winx_hint_red_bits + __winx_hint_green_bits + __winx_hint_blue_bits;
+	int __winx_hint_color_bits = __winx_hint_red_bits + __winx_hint_green_bits + __winx_hint_blue_bits + __winx_hint_alpha_bits;
 
 	PIXELFORMATDESCRIPTOR pixelFormatDesc;
 	memset(&pixelFormatDesc, 0, sizeof(PIXELFORMATDESCRIPTOR));
@@ -513,24 +513,14 @@ bool winxOpen(int width, int height, const char* title) {
 
 	fakeRenderContext = wglCreateContext(fakeDeviceContext);
 	if (!fakeRenderContext) {
-		__winx_msg = (char*) "wglCreateContext: Failed to create fake render context!";
+		__winx_msg = (char*) "wglCreateContext: Failed to create temporary render context!";
 		return false;
 	}
-
-	// close fake window
-	wglMakeCurrent(fakeDeviceContext, NULL);
-	wglDeleteContext(fakeRenderContext);
-	ReleaseDC(fakeHndl, fakeDeviceContext);
-	DestroyWindow(fakeHndl);
-
-	fakeDeviceContext = NULL;
-	fakeRenderContext = NULL;
-	fakeHndl = NULL;
 
 	// open real window
 	winx->hndl = CreateWindow(clazz, title, WS_OVERLAPPEDWINDOW, 0, 0, width, height, NULL, NULL, hinstance, NULL);
 	if (!winx->hndl) {
-		__winx_msg = (char*) "CreateWindowW: Failed to create window!";
+		__winx_msg = (char*) "CreateWindow: Failed to create window!";
 		return false;
 	}
 
@@ -544,14 +534,17 @@ bool winxOpen(int width, int height, const char* title) {
 	PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
 	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 
-	wglMakeCurrent(fakeDeviceContext, fakeRenderContext);
+	if (!wglMakeCurrent(fakeDeviceContext, fakeRenderContext)) {
+		__winx_msg = (char*) "wglMakeCurrent: Failed to select temporary context!";
+		return false;
+	}
 
 	wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC) winxGetWglProc("wglChoosePixelFormatARB");
 	wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC) winxGetWglProc("wglCreateContextAttribsARB");
 	wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC) wglGetProcAddress("wglSwapIntervalEXT"); // optional
 
 	if (__winx_msg != NULL) {
-		// getWglProc set the error message
+		// winxGetWglProc set the error message
 		return false;
 	}
 
@@ -600,6 +593,18 @@ bool winxOpen(int width, int height, const char* title) {
 		__winx_msg = (char*) "wglChoosePixelFormatARB: Failed to choose a pixel format!";
 		return false;
 	}
+
+	// close temporary window
+	wglMakeCurrent(fakeDeviceContext, NULL);
+	wglDeleteContext(fakeRenderContext);
+	ReleaseDC(fakeHndl, fakeDeviceContext);
+	DestroyWindow(fakeHndl);
+
+	fakeDeviceContext = NULL;
+	fakeRenderContext = NULL;
+	fakeHndl = NULL;
+
+	wglMakeCurrent(winx->device, winx->context);
 
 	// set vsync
 	if (wglSwapIntervalEXT && __winx_hint_vsync) {

@@ -27,10 +27,9 @@ void wait() {
 	}
 }
 
-void keyboardEvent(int state, int key) {
-	if( state = WINX_PRESSED ) {
-		exit(0);
-	}
+void closeEventHandle() {
+	winxClose();
+	exit(0);
 }
 
 int main() {
@@ -40,7 +39,7 @@ int main() {
 		exit(1);
 	}
 
-//	winxSetKeyboardHandle(window, keyboardEvent);
+	winxSetCloseEventHandle(closeEventHandle);
 
 	while(1) {
 		winxPollEvents();
@@ -50,8 +49,6 @@ int main() {
 		winxSwapBuffers();
 		wait();
 	}
-
-	winxClose();
 
 }
 

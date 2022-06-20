@@ -31,16 +31,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-typedef void (*WinxEventHandle)(int, int);
+typedef void (*WinxMouseEventHandle)(int, int);
+typedef void (*WinxButtonEventHandle)(int, int, int, int);
+typedef void (*WinxKeybordEventHandle)(int, int);
+typedef void (*WinxCloseEventHandle)(void);
 
-/// used to open new window
-bool winxOpen(int width, int height, const char* title);
-
-/// used to close window
-void winxClose();
+/// set a window hint, has to be called prior to winxOpen()
+void winxHint(int hint, int value);
 
 /// return and clear last winx error, or NULL if there was no error
 char* winxGetError();
+
+/// used to open new window
+bool winxOpen(int width, int height, const char* title);
 
 /// process pending events
 void winxPollEvents();
@@ -48,22 +51,34 @@ void winxPollEvents();
 /// swap display buffers
 void winxSwapBuffers();
 
-/// set a window hint, has to be called prior to winxOpen()
-void winxHint(int hint, int value);
+/// used to close window
+void winxClose();
+
+/// set the handle for mouse movement events, requires an open window
+void winxSetMouseHandle(WinxMouseEventHandle handle);
+
+/// set the handle for mouse click events, requires an open window
+void winxSetButtonEventHandle(WinxButtonEventHandle handle);
+
+/// set the handle for keybord events, requires an open window
+void winxSetKeybordEventHandle(WinxKeybordEventHandle handle);
+
+/// set the handle for window close button, requires an open window
+void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 
 #define WINX_PRESSED 1
 #define WINX_RELEASED 0
 
 /// hint keys
-#define WINX_HINT_VSYNC			0x01 // TODO GLX
-#define WINX_HINT_RED_BITS		0x02
-#define WINX_HINT_GREEN_BITS	0x03
-#define WINX_HINT_BLUE_BITS		0x04
-#define WINX_HINT_ALPHA_BITS	0x05
-#define WINX_HINT_DEPTH_BITS	0x06
-#define WINX_HINT_OPENGL_MAJOR	0x07 // TODO GLX
-#define WINX_HINT_OPENGL_MINOR	0x08 // TODO GLX
-#define WINX_HINT_OPENGL_CORE	0x09 // TODO GLX
+#define WINX_HINT_VSYNC        0x01 // TODO GLX
+#define WINX_HINT_RED_BITS     0x02
+#define WINX_HINT_GREEN_BITS   0x03
+#define WINX_HINT_BLUE_BITS    0x04
+#define WINX_HINT_ALPHA_BITS   0x05
+#define WINX_HINT_DEPTH_BITS   0x06
+#define WINX_HINT_OPENGL_MAJOR 0x07 // TODO GLX
+#define WINX_HINT_OPENGL_MINOR 0x08 // TODO GLX
+#define WINX_HINT_OPENGL_CORE  0x09 // TODO GLX
 
 /// hint values
 #define WINX_VSYNC_DISABLED 0
@@ -77,6 +92,13 @@ void winxHint(int hint, int value);
 
 #if defined(WINX_IMPLEMENT)
 
+// dummy functions
+void WinxDummyMouseEventHandle(int x, int y) {}
+void WinxDummyButtonEventHandle(int type, int button, int x, int y) {}
+void WinxDummyKeybordEventHandle(int type, int key) {}
+void WinxDummyCloseEventHandle() {}
+
+// hints
 int __winx_hint_vsync = 0;
 int __winx_hint_red_bits = 8;
 int __winx_hint_green_bits = 8;
@@ -87,6 +109,7 @@ int __winx_hint_opengl_major = 3;
 int __winx_hint_opengl_minor = 0;
 int __winx_hint_opengl_core = 1;
 
+// current error message
 char* __winx_msg = NULL;
 
 char* winxGetError() {
@@ -148,18 +171,16 @@ void winxHint(int hint, int value) {
 #include <X11/keysym.h>
 #include <GL/glx.h>
 
-// dummy functions
-void DummyEventHandle(int a, int b) {}
-
 typedef struct {
 	Display* display;
 	Window window;
 	GLXContext context;
 	Atom WM_DELETE_WINDOW;
 
-	WinxEventHandle mouse;
-	WinxEventHandle button;
-	WinxEventHandle keyboard;
+	WinxMouseEventHandle mouse;
+	WinxButtonEventHandle button;
+	WinxKeybordEventHandle keyboard;
+	WinxCloseEventHandle close;
 } WinxHandle;
 
 WinxHandle* winx = NULL;
@@ -168,9 +189,10 @@ bool winxOpen(int width, int height, const char* title) {
 	winx = (WinxHandle*) malloc(sizeof(WinxHandle));
 
 	// set dummy function pointers
-	winx->keyboard = DummyEventHandle;
-	winx->button = DummyEventHandle;
-	winx->mouse = DummyEventHandle;
+	winx->button = WinxDummyButtonEventHandle;
+	winx->mouse = WinxDummyMouseEventHandle;
+	winx->keyboard = WinxDummyKeybordEventHandle;
+	winx->close = WinxDummyCloseEventHandle;
 
 	// get display handle
 	winx->display = XOpenDisplay(NULL);
@@ -237,12 +259,6 @@ bool winxOpen(int width, int height, const char* title) {
 	return true;
 }
 
-void winxClose() {
-	glXDestroyContext(winx->display, winx->context);
-	XDestroyWindow(winx->display, winx->window);
-	XCloseDisplay(winx->display);
-}
-
 void winxPollEvents() {
 	while( XPending(winx->display) > 0 ) {
 
@@ -253,7 +269,7 @@ void winxPollEvents() {
 
 			case ClientMessage:
 				if (event.xclient.data.l[0] == winx->WM_DELETE_WINDOW) {
-					// TODO fire close event
+					winx->close();
 					break;
 				}
 
@@ -269,11 +285,11 @@ void winxPollEvents() {
 				break;
 
 			case ButtonPress:
-				winx->button(WINX_PRESSED, event.xbutton.button);
+				winx->button(WINX_PRESSED, event.xbutton.button, event.xbutton.x_root, event.xbutton.y_root);
 				break;
 
 			case ButtonRelease:
-				winx->button(WINX_RELEASED, event.xbutton.button);
+				winx->button(WINX_RELEASED, event.xbutton.button, event.xbutton.x_root, event.xbutton.y_root);
 				break;
 
 			case MotionNotify:
@@ -287,6 +303,31 @@ void winxPollEvents() {
 
 void winxSwapBuffers() {
 	glXSwapBuffers(winx->display, winx->window);
+}
+
+void winxClose() {
+	glXDestroyContext(winx->display, winx->context);
+	XDestroyWindow(winx->display, winx->window);
+	XCloseDisplay(winx->display);
+
+	free(winx);
+	winx = NULL;
+}
+
+void winxSetMouseHandle(WinxMouseEventHandle handle) {
+	if (winx != NULL) winx->mouse = handle;
+}
+
+void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
+	if (winx != NULL) winx->button = handle;
+}
+
+void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
+	if (winx != NULL) winx->keyboard = handle;
+}
+
+void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
+	if (winx != NULL) winx->close = handle;
 }
 
 #endif // GLX
@@ -329,11 +370,16 @@ typedef struct {
 	HWND hndl;
 	HDC device;
 	HGLRC context;
+
+	WinxMouseEventHandle mouse;
+	WinxButtonEventHandle button;
+	WinxKeybordEventHandle keyboard;
+	WinxCloseEventHandle close;
 } WinxHandle;
 
 WinxHandle* winx = NULL;
 
-PROC getWglProc(LPCSTR name) {
+PROC winxGetWglProc(LPCSTR name) {
 	if (__winx_msg == NULL) {
 		PROC proc = wglGetProcAddress(name);
 
@@ -347,7 +393,7 @@ PROC getWglProc(LPCSTR name) {
 	return NULL;
 }
 
-LRESULT CALLBACK wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	LRESULT result = 0;
 
 	switch (message) {
@@ -357,8 +403,7 @@ LRESULT CALLBACK wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 			break;
 
 		case WM_CLOSE:
-			winxClose();
-			PostQuitMessage(0);
+			winx->close();
 			break;
 
 		default:
@@ -373,6 +418,12 @@ bool winxOpen(int width, int height, const char* title) {
 	winx = (WinxHandle*) malloc(sizeof(WinxHandle));
 	HINSTANCE hinstance = GetModuleHandle(NULL);
 
+	// set dummy function pointers
+	winx->button = WinxDummyButtonEventHandle;
+	winx->mouse = WinxDummyMouseEventHandle;
+	winx->keyboard = WinxDummyKeybordEventHandle;
+	winx->close = WinxDummyCloseEventHandle;
+
 	// register window class
 	char* clazz = "WinxOpenGLClass";
 
@@ -380,7 +431,7 @@ bool winxOpen(int width, int height, const char* title) {
 	memset(&wcex, 0, sizeof(wcex));
 	wcex.cbSize = sizeof(WNDCLASSEX);
 	wcex.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
-	wcex.lpfnWndProc = (WNDPROC) wndProc;
+	wcex.lpfnWndProc = (WNDPROC) winxWndProc;
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
 	wcex.hInstance = hinstance;
@@ -471,8 +522,8 @@ bool winxOpen(int width, int height, const char* title) {
 
 	wglMakeCurrent(fakeDeviceContext, fakeRenderContext);
 
-	wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC) getWglProc("wglChoosePixelFormatARB");
-	wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC) getWglProc("wglCreateContextAttribsARB");
+	wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC) winxGetWglProc("wglChoosePixelFormatARB");
+	wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC) winxGetWglProc("wglCreateContextAttribsARB");
 	wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC) wglGetProcAddress("wglSwapIntervalEXT"); // optional
 
 	if (__winx_msg != NULL) {
@@ -555,6 +606,25 @@ void winxClose() {
 	wglDeleteContext(winx->context);
 	ReleaseDC(winx->hndl, winx->device);
 	DestroyWindow(winx->hndl);
+
+	free(winx);
+	winx = NULL;
+}
+
+void winxSetMouseHandle(WinxMouseEventHandle handle) {
+	if (winx != NULL) winx->mouse = handle;
+}
+
+void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
+	if (winx != NULL) winx->button = handle;
+}
+
+void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
+	if (winx != NULL) winx->keyboard = handle;
+}
+
+void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
+	if (winx != NULL) winx->close = handle;
 }
 
 #endif // WINAPI

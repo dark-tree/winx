@@ -32,7 +32,7 @@
 #include <stdio.h>
 
 typedef void (*WinxMouseEventHandle)(int, int);
-typedef void (*WinxButtonEventHandle)(int, int, int, int);
+typedef void (*WinxButtonEventHandle)(int, int);
 typedef void (*WinxKeybordEventHandle)(int, int);
 typedef void (*WinxCloseEventHandle)(void);
 
@@ -94,7 +94,7 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 
 // dummy functions
 void WinxDummyMouseEventHandle(int x, int y) {}
-void WinxDummyButtonEventHandle(int type, int button, int x, int y) {}
+void WinxDummyButtonEventHandle(int type, int button) {}
 void WinxDummyKeybordEventHandle(int type, int key) {}
 void WinxDummyCloseEventHandle() {}
 
@@ -197,7 +197,7 @@ bool winxOpen(int width, int height, const char* title) {
 	// get display handle
 	winx->display = XOpenDisplay(NULL);
 	if( !winx->display ) {
-		__winx_msg = (char*) "Failed to acquire X11 display handle!";
+		__winx_msg = (char*) "XOpenDisplay: Failed to acquire display handle!";
 		return false;
 	}
 
@@ -219,7 +219,7 @@ bool winxOpen(int width, int height, const char* title) {
 	// find visual based on glx_attributes
 	XVisualInfo* info = glXChooseVisual(winx->display, screen, glx_attributes);
 	if( !info ) {
-		__winx_msg = (char*) "Failed to acquire GLX visual!";
+		__winx_msg = (char*) "glXChooseVisual: Failed to choose a visual!";
 		return false;
 	}
 
@@ -242,7 +242,7 @@ bool winxOpen(int width, int height, const char* title) {
 	// create GLX context
 	winx->context = glXCreateContext(winx->display, info, NULL, 1);
 	if( !winx->context ) {
-		__winx_msg = (char*) "Failed to create GLX context!";
+		__winx_msg = (char*) "glXCreateContext: Failed to create GLX context!";
 		return false;
 	}
 
@@ -265,16 +265,13 @@ void winxPollEvents() {
 		XEvent event;
 		XNextEvent(winx->display, &event);
 
-		switch( event.type ) {
+		switch (event.type) {
 
 			case ClientMessage:
 				if (event.xclient.data.l[0] == winx->WM_DELETE_WINDOW) {
 					winx->close();
 					break;
 				}
-
-			case Expose:
-				break;
 
 			case KeyPress:
 				winx->keyboard(WINX_PRESSED, XLookupKeysym(&event.xkey, 0));
@@ -285,15 +282,18 @@ void winxPollEvents() {
 				break;
 
 			case ButtonPress:
-				winx->button(WINX_PRESSED, event.xbutton.button, event.xbutton.x_root, event.xbutton.y_root);
+				winx->button(WINX_PRESSED, event.xbutton.button);
 				break;
 
 			case ButtonRelease:
-				winx->button(WINX_RELEASED, event.xbutton.button, event.xbutton.x_root, event.xbutton.y_root);
+				winx->button(WINX_RELEASED, event.xbutton.button);
 				break;
 
 			case MotionNotify:
 				winx->mouse(event.xmotion.x_root, event.xmotion.y_root);
+				break;
+
+			default:
 				break;
 
 		}
@@ -336,6 +336,7 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <windowsx.h>
 #include <gl/GL.h>
 
 /* copied from wglext.h */
@@ -398,8 +399,31 @@ LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 
 	switch (message) {
 		case WM_KEYDOWN:
-			if (wParam == 27)
-				PostMessage(hWnd, WM_CLOSE, 0, 0);
+			winx->keyboard(WINX_PRESSED, wParam);
+			break;
+
+		case WM_KEYUP:
+			winx->keyboard(WINX_RELEASED, wParam);
+			break;
+
+		case WM_MOUSEMOVE:
+			winx->mouse(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			break;
+
+		case WM_LBUTTONDOWN:
+			winx->button(WINX_PRESSED, 0);
+			break;
+
+		case WM_LBUTTONUP:
+			winx->button(WINX_RELEASED, 0);
+			break;
+
+		case WM_RBUTTONDOWN:
+			winx->button(WINX_PRESSED, 1);
+			break;
+
+		case WM_RBUTTONUP:
+			winx->button(WINX_RELEASED, 1);
 			break;
 
 		case WM_CLOSE:

@@ -250,7 +250,7 @@ typedef struct {
 
 WinxHandle* winx = NULL;
 
-__GLXextFuncPtr winxGetProc(char* name) {
+__GLXextFuncPtr winxGetProc(const char* name) {
 	if (__winx_msg == NULL) {
 		__GLXextFuncPtr proc = glXGetProcAddress(name);
 
@@ -657,27 +657,25 @@ bool winxOpen(int width, int height, const char* title) {
 		return false;
 	}
 
-	int __winx_hint_color_bits = __winx_hint_red_bits + __winx_hint_green_bits + __winx_hint_blue_bits + __winx_hint_alpha_bits;
-
-	PIXELFORMATDESCRIPTOR pixelFormatDesc;
-	memset(&pixelFormatDesc, 0, sizeof(PIXELFORMATDESCRIPTOR));
-	pixelFormatDesc.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-	pixelFormatDesc.nVersion = 1;
-	pixelFormatDesc.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL;
-	pixelFormatDesc.iPixelType = PFD_TYPE_RGBA;
-	pixelFormatDesc.cRedBits = __winx_hint_red_bits;
-	pixelFormatDesc.cGreenBits = __winx_hint_green_bits;
-	pixelFormatDesc.cBlueBits = __winx_hint_blue_bits;
-	pixelFormatDesc.cAlphaBits = __winx_hint_alpha_bits;
-	pixelFormatDesc.cDepthBits = __winx_hint_depth_bits;
-	int fakePixelFormat = ChoosePixelFormat(fakeDeviceContext, &pixelFormatDesc);
+	PIXELFORMATDESCRIPTOR descriptor;
+	memset(&descriptor, 0, sizeof(PIXELFORMATDESCRIPTOR));
+	descriptor.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+	descriptor.nVersion = 1;
+	descriptor.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL;
+	descriptor.iPixelType = PFD_TYPE_RGBA;
+	descriptor.cRedBits = __winx_hint_red_bits;
+	descriptor.cGreenBits = __winx_hint_green_bits;
+	descriptor.cBlueBits = __winx_hint_blue_bits;
+	descriptor.cAlphaBits = __winx_hint_alpha_bits;
+	descriptor.cDepthBits = __winx_hint_depth_bits;
+	int fakePixelFormat = ChoosePixelFormat(fakeDeviceContext, &descriptor);
 
 	if (!fakePixelFormat) {
 		__winx_msg = (char*) "ChoosePixelFormat: Failed to choose a pixel format!";
 		return false;
 	}
 
-	if (!SetPixelFormat(fakeDeviceContext, fakePixelFormat, &pixelFormatDesc)) {
+	if (!SetPixelFormat(fakeDeviceContext, fakePixelFormat, &descriptor)) {
 		__winx_msg = (char*) "SetPixelFormat: Failed to select a pixel format!";
 		return false;
 	}

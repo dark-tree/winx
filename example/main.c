@@ -1,11 +1,16 @@
 
-#define WINX_IMPLEMENT
-#include "winx.h"
+#include "glad/glad.h"
 
+#define WINX_IMPLEMENT
+#include <winx.h>
+
+#include "glad/glad.c"
 #include <stdio.h>
 #include <sys/time.h>
 
-void wait() {
+#include "render.h"
+
+void watch() {
 	static int t0 = -1;
 	static int frames = 0;
 
@@ -34,20 +39,25 @@ void closeEventHandle() {
 
 int main() {
 
-	if (!winxOpen(500, 300, "test")) {
+	if (!winxOpen(500, 300, "WINX OpenGL 3.0 Example")) {
 		printf("Error occured! %s\n", winxGetError());
 		exit(1);
 	}
 
+	// use GLAD to load OpenGL functions
+	gladLoadGL();
+
+	// init OpenGL example
+	init();
+
 	winxSetCloseEventHandle(closeEventHandle);
 
 	while(1) {
-		winxPollEvents();
-
-		// draw here (or not)
+		draw();
 
 		winxSwapBuffers();
-		wait();
+		winxPollEvents();
+		watch();
 	}
 
 }

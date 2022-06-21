@@ -10,6 +10,7 @@
 
 #include "render.h"
 
+// for printing fps every 5s
 void watch() {
 	static int t0 = -1;
 	static int frames = 0;

@@ -50,6 +50,7 @@
  *	Once a window is open you can begin the render loop and call 'winxSwapBuffers' and 'winxPollEvents'.
  *	To register callbacks for window events use the 'winxSet*EventHandle' family of functions and their respective
  *	'Winx*EventHandle' callback types. Clicking on a "close window" button can be detected with the 'winxSetCloseEventHandle'.
+ *	The Vsync behaviour can also be changed after window creation using 'winxSetVsync'.
  *
  *	while(1) {
  *		// draw here
@@ -70,6 +71,7 @@ typedef void (*WinxButtonEventHandle)(int, int);
 typedef void (*WinxKeybordEventHandle)(int, int);
 typedef void (*WinxScrollEventHandle)(int);
 typedef void (*WinxCloseEventHandle)(void);
+typedef void (*WinxResizeEventHandle)(int, int);
 
 /// set a window hint, has to be called prior to winxOpen()
 void winxHint(int hint, int value);
@@ -86,26 +88,32 @@ void winxPollEvents();
 /// swap display buffers
 void winxSwapBuffers();
 
-/// used to close window
+/// used to close current window
 void winxClose();
 
-/// set window title
+/// set title for current window
 void winxSetTitle(const char* title);
 
-/// set the handle for mouse movement events, requires an open window
+/// set desired vsync behaviour for current window
+void winxSetVsync(int vsync);
+
+/// set the handle for mouse movement events for current window
 void winxSetMouseHandle(WinxMouseEventHandle handle);
 
-/// set the handle for mouse click events, requires an open window
+/// set the handle for mouse click events for current window
 void winxSetButtonEventHandle(WinxButtonEventHandle handle);
 
-/// set the handle for keybord events, requires an open window
+/// set the handle for keybord events for current window
 void winxSetKeybordEventHandle(WinxKeybordEventHandle handle);
 
-/// set the handle for mouse scroll, requires an open window
+/// set the handle for mouse scroll for current window
 void winxSetScrollEventHandle(WinxScrollEventHandle handle);
 
-/// set the handle for window close button, requires an open window
+/// set the handle for window close button for current window
 void winxSetCloseEventHandle(WinxCloseEventHandle handle);
+
+/// set the handle for window resize event for current window
+void winxSetResizeEventHandle(WinxResizeEventHandle handle);
 
 #define WINX_PRESSED 1
 #define WINX_RELEASED 0
@@ -128,6 +136,7 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 /// hint values
 #define WINX_VSYNC_DISABLED 0
 #define WINX_VSYNC_ENABLED 1
+#define WINX_VSYNC_ADAPTIVE -1
 
 #if defined(__unix__) || defined(__linux__)
 #	define WINX_GLX
@@ -173,28 +182,29 @@ void WinxDummyButtonEventHandle(int type, int button) {}
 void WinxDummyKeybordEventHandle(int type, int key) {}
 void WinxDummyScrollEventHandle(int scroll) {}
 void WinxDummyCloseEventHandle() {}
+void WinxDummyResizeEventHandle(int width, int height) {}
 
 // hints
-int __winx_hint_vsync = 0;
-int __winx_hint_red_bits = 8;
-int __winx_hint_green_bits = 8;
-int __winx_hint_blue_bits = 8;
-int __winx_hint_alpha_bits = 8;
-int __winx_hint_depth_bits = 24;
-int __winx_hint_stencil_bits = 1;
-int __winx_hint_opengl_major = 3;
-int __winx_hint_opengl_minor = 0;
-int __winx_hint_opengl_core = 1;
-int __winx_hint_opengl_debug = 0;
-int __winx_hint_opengl_robust = 0;
-int __winx_hint_multisamples = 0;
+static int __winx_hint_vsync = 0;
+static int __winx_hint_red_bits = 8;
+static int __winx_hint_green_bits = 8;
+static int __winx_hint_blue_bits = 8;
+static int __winx_hint_alpha_bits = 8;
+static int __winx_hint_depth_bits = 24;
+static int __winx_hint_stencil_bits = 1;
+static int __winx_hint_opengl_major = 3;
+static int __winx_hint_opengl_minor = 0;
+static int __winx_hint_opengl_core = 1;
+static int __winx_hint_opengl_debug = 0;
+static int __winx_hint_opengl_robust = 0;
+static int __winx_hint_multisamples = 0;
 
 // current error message
-char* __winx_msg = NULL;
+static char* winxErrorMsg = NULL;
 
 char* winxGetError() {
-	char* copy = __winx_msg;
-	__winx_msg = NULL;
+	char* copy = winxErrorMsg;
+	winxErrorMsg = NULL;
 
 	return copy;
 }
@@ -230,9 +240,11 @@ void winxHint(int hint, int value) {
 
 // copied from glxext.h
 typedef int ( *PFNGLXSWAPINTERVALMESAPROC) (unsigned int interval);
+typedef void ( *PFNGLXSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawable, int interval);
 typedef GLXContext ( *PFNGLXCREATECONTEXTATTRIBSARBPROC) (Display *dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
 
 PFNGLXSWAPINTERVALMESAPROC glXSwapIntervalMESA;
+PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT;
 PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB;
 
 typedef struct {
@@ -246,16 +258,17 @@ typedef struct {
 	WinxKeybordEventHandle keyboard;
 	WinxScrollEventHandle scroll;
 	WinxCloseEventHandle close;
+	WinxResizeEventHandle resize;
 } WinxHandle;
 
 WinxHandle* winx = NULL;
 
-__GLXextFuncPtr winxGetProc(const char* name) {
-	if (__winx_msg == NULL) {
-		__GLXextFuncPtr proc = glXGetProcAddress(name);
+static __GLXextFuncPtr winxGetProc(const char* name) {
+	if (winxErrorMsg == NULL) {
+		__GLXextFuncPtr proc = glXGetProcAddress((const unsigned char*) name);
 
 		if (proc == NULL) {
-			__winx_msg = "glXGetProcAddress: Failed to load function!";
+			winxErrorMsg = (char*) "glXGetProcAddress: Failed to load function!";
 		}
 
 		return proc;
@@ -273,11 +286,12 @@ bool winxOpen(int width, int height, const char* title) {
 	winx->keyboard = WinxDummyKeybordEventHandle;
 	winx->scroll = WinxDummyScrollEventHandle;
 	winx->close = WinxDummyCloseEventHandle;
+	winx->resize = WinxDummyResizeEventHandle;
 
 	// get display handle
 	winx->display = XOpenDisplay(NULL);
 	if (!winx->display) {
-		__winx_msg = (char*) "XOpenDisplay: Failed to acquire display handle!";
+		winxErrorMsg = (char*) "XOpenDisplay: Failed to acquire display handle!";
 		return false;
 	}
 
@@ -302,15 +316,15 @@ bool winxOpen(int width, int height, const char* title) {
 	// find frame buffer config matching our attributes
 	int count;
 	GLXFBConfig *fbconfigs = glXChooseFBConfig(winx->display, screen, attributes, &count);
-	if (!fbconfigs || count == 0) {
-		__winx_msg = (char*) "glXChooseFBConfig: Failed to choose a frame buffer config!";
+	if (!fbconfigs || !count) {
+		winxErrorMsg = (char*) "glXChooseFBConfig: Failed to choose a frame buffer config!";
 		return false;
 	}
 
 	// find visual based on framebuffer's config
 	XVisualInfo* info = glXGetVisualFromFBConfig(winx->display, fbconfigs[0]);
 	if (!info) {
-		__winx_msg = (char*) "glXGetVisualFromFBConfig: Failed to choose a visual!";
+		winxErrorMsg = (char*) "glXGetVisualFromFBConfig: Failed to choose a visual!";
 		return false;
 	}
 
@@ -335,16 +349,17 @@ bool winxOpen(int width, int height, const char* title) {
 	// create GLX context
 	GLXContext context = glXCreateContext(winx->display, info, NULL, 1);
 	if (!context) {
-		__winx_msg = (char*) "glXCreateContext: Failed to create GLX context!";
+		winxErrorMsg = (char*) "glXCreateContext: Failed to create GLX context!";
 		return false;
 	}
 
 	glXMakeCurrent(winx->display, winx->window, context);
 
 	glXCreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC) winxGetProc("glXCreateContextAttribsARB");
-	glXSwapIntervalMESA = (PFNGLXSWAPINTERVALMESAPROC) glXGetProcAddress("glXSwapIntervalMESA"); // optional
+	glXSwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC) glXGetProcAddress((const unsigned char*) "glXSwapIntervalEXT"); // optional
+	glXSwapIntervalMESA = (PFNGLXSWAPINTERVALMESAPROC) glXGetProcAddress((const unsigned char*) "glXSwapIntervalMESA"); // optional
 
-	if (__winx_msg != NULL) {
+	if (winxErrorMsg != NULL) {
 		return false;
 	}
 
@@ -368,7 +383,7 @@ bool winxOpen(int width, int height, const char* title) {
 
 	winx->context = glXCreateContextAttribsARB(winx->display, fbconfigs[0], NULL, true, context_attributes);
 	if (!winx->context) {
-		__winx_msg = "glXCreateContextAttribsARB: Failed to create context";
+		winxErrorMsg = (char*) "glXCreateContextAttribsARB: Failed to create context";
 		return false;
 	}
 
@@ -378,10 +393,8 @@ bool winxOpen(int width, int height, const char* title) {
 	winx->WM_DELETE_WINDOW = XInternAtom(winx->display, "WM_DELETE_WINDOW", false);
 	XSetWMProtocols(winx->display, winx->window, &(winx->WM_DELETE_WINDOW), 1);
 
-	// try setting vsync
-	if (glXSwapIntervalMESA && __winx_hint_vsync) {
-		glXSwapIntervalMESA(__winx_hint_vsync);
-	}
+	// set vsync
+	winxSetVsync(__winx_hint_vsync);
 
 	return true;
 }
@@ -430,6 +443,10 @@ void winxPollEvents() {
 				winx->mouse(event.xmotion.x_root, event.xmotion.y_root);
 				break;
 
+			case ConfigureNotify:
+				winx->resize(event.xconfigure.width, event.xconfigure.height);
+				break;
+
 			default:
 				break;
 
@@ -452,28 +469,26 @@ void winxClose() {
 }
 
 void winxSetTitle(const char* title) {
-	XStoreName(winx->display, winx->window, title);
-	XSetIconName(winx->display, winx->window, title);
+	if (winx) {
+		XStoreName(winx->display, winx->window, title);
+		XSetIconName(winx->display, winx->window, title);
+	} else {
+		winxErrorMsg = (char*) "winxSetTitle: No active winx context!";
+	}
 }
 
-void winxSetMouseHandle(WinxMouseEventHandle handle) {
-	if (winx != NULL) winx->mouse = handle;
-}
-
-void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
-	if (winx != NULL) winx->button = handle;
-}
-
-void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
-	if (winx != NULL) winx->keyboard = handle;
-}
-
-void winxSetScrollEventHandle(WinxScrollEventHandle handle) {
-	if (winx != NULL) winx->scroll = handle;
-}
-
-void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
-	if (winx != NULL) winx->close = handle;
+void winxSetVsync(int vsync) {
+	if (winx) {
+		if (glXSwapIntervalEXT) {
+			glXSwapIntervalEXT(winx->display, glXGetCurrentDrawable(), __winx_hint_vsync);
+		} else {
+			if (glXSwapIntervalMESA) {
+				glXSwapIntervalMESA(__winx_hint_vsync == WINX_VSYNC_ADAPTIVE ? WINX_VSYNC_ENABLED : __winx_hint_vsync);
+			}
+		}
+	} else {
+		winxErrorMsg = (char*) "winxSetVsync: No active winx context!";
+	}
 }
 
 #endif // GLX
@@ -532,16 +547,17 @@ typedef struct {
 	WinxKeybordEventHandle keyboard;
 	WinxScrollEventHandle scroll;
 	WinxCloseEventHandle close;
+	WinxResizeEventHandle resize;
 } WinxHandle;
 
 WinxHandle* winx = NULL;
 
-PROC winxGetProc(LPCSTR name) {
-	if (__winx_msg == NULL) {
+static PROC winxGetProc(LPCSTR name) {
+	if (winxErrorMsg == NULL) {
 		PROC proc = wglGetProcAddress(name);
 
 		if (proc == NULL) {
-			__winx_msg = "wglGetProcAddress: Failed to load function!";
+			winxErrorMsg = (char*) "wglGetProcAddress: Failed to load function!";
 		}
 
 		return proc;
@@ -550,7 +566,7 @@ PROC winxGetProc(LPCSTR name) {
 	return NULL;
 }
 
-LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	LRESULT result = 0;
 
 	switch (message) {
@@ -598,6 +614,10 @@ LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 			winx->close();
 			break;
 
+		case WM_SIZE:
+			winx->resize(LOWORD(lParam), HIWORD(lParam));
+			break;
+
 		default:
 			result = DefWindowProc(hWnd, message, wParam, lParam);
 	}
@@ -616,9 +636,10 @@ bool winxOpen(int width, int height, const char* title) {
 	winx->keyboard = WinxDummyKeybordEventHandle;
 	winx->scroll = WinxDummyScrollEventHandle;
 	winx->close = WinxDummyCloseEventHandle;
+	winx->resize = WinxDummyResizeEventHandle;
 
 	// register window class
-	char* clazz = "WinxOpenGLClass";
+	const char* clazz = "WinxOpenGLClass";
 
 	WNDCLASSEX wcex;
 	memset(&wcex, 0, sizeof(wcex));
@@ -636,7 +657,7 @@ bool winxOpen(int width, int height, const char* title) {
 	wcex.hIconSm = NULL;
 
 	if (!RegisterClassEx(&wcex)) {
-		__winx_msg = (char*) "RegisterClassEx: Failed to register window class!";
+		winxErrorMsg = (char*) "RegisterClassEx: Failed to register window class!";
 		return false;
 	}
 
@@ -647,13 +668,13 @@ bool winxOpen(int width, int height, const char* title) {
 	// create temporary window to get WGL context
 	fakeHndl = CreateWindow(clazz, "WINX", WS_OVERLAPPEDWINDOW, 0, 0, 1, 1, NULL, NULL, hinstance, NULL);
 	if (!fakeHndl) {
-		__winx_msg = (char*) "CreateWindow: Failed to create temporary window!";
+		winxErrorMsg = (char*) "CreateWindow: Failed to create temporary window!";
 		return false;
 	}
 
 	fakeDeviceContext = GetDC(fakeHndl);
 	if (!fakeDeviceContext) {
-		__winx_msg = (char*) "GetDC: Failed to create temporary device context!";
+		winxErrorMsg = (char*) "GetDC: Failed to create temporary device context!";
 		return false;
 	}
 
@@ -671,32 +692,32 @@ bool winxOpen(int width, int height, const char* title) {
 	int fakePixelFormat = ChoosePixelFormat(fakeDeviceContext, &descriptor);
 
 	if (!fakePixelFormat) {
-		__winx_msg = (char*) "ChoosePixelFormat: Failed to choose a pixel format!";
+		winxErrorMsg = (char*) "ChoosePixelFormat: Failed to choose a pixel format!";
 		return false;
 	}
 
 	if (!SetPixelFormat(fakeDeviceContext, fakePixelFormat, &descriptor)) {
-		__winx_msg = (char*) "SetPixelFormat: Failed to select a pixel format!";
+		winxErrorMsg = (char*) "SetPixelFormat: Failed to select a pixel format!";
 		return false;
 	}
 
 	fakeRenderContext = wglCreateContext(fakeDeviceContext);
 	if (!fakeRenderContext) {
-		__winx_msg = (char*) "wglCreateContext: Failed to create temporary render context!";
+		winxErrorMsg = (char*) "wglCreateContext: Failed to create temporary render context!";
 		return false;
 	}
 
 	// open real window
 	winx->hndl = CreateWindow(clazz, title, WS_OVERLAPPEDWINDOW, 0, 0, width, height, NULL, NULL, hinstance, NULL);
 	if (!winx->hndl) {
-		__winx_msg = (char*) "CreateWindow: Failed to create window!";
+		winxErrorMsg = (char*) "CreateWindow: Failed to create window!";
 		return false;
 	}
 
 	// create context
 	winx->device = GetDC(winx->hndl);
 	if (!winx->device) {
-		__winx_msg = (char*) "GetDC: Failed to create device context!";
+		winxErrorMsg = (char*) "GetDC: Failed to create device context!";
 		return false;
 	}
 
@@ -704,7 +725,7 @@ bool winxOpen(int width, int height, const char* title) {
 	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 
 	if (!wglMakeCurrent(fakeDeviceContext, fakeRenderContext)) {
-		__winx_msg = (char*) "wglMakeCurrent: Failed to select temporary context!";
+		winxErrorMsg = (char*) "wglMakeCurrent: Failed to select temporary context!";
 		return false;
 	}
 
@@ -712,7 +733,7 @@ bool winxOpen(int width, int height, const char* title) {
 	wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC) winxGetProc("wglCreateContextAttribsARB");
 	wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC) wglGetProcAddress("wglSwapIntervalEXT"); // optional
 
-	if (__winx_msg != NULL) {
+	if (winxErrorMsg != NULL) {
 		// winxGetProc set the error message
 		return false;
 	}
@@ -759,18 +780,18 @@ bool winxOpen(int width, int height, const char* title) {
 		DescribePixelFormat(winx->device, pixelFormat, sizeof(PIXELFORMATDESCRIPTOR), &pfd);
 
 		if (!SetPixelFormat(winx->device, pixelFormat, &pfd)) {
-			__winx_msg = (char*) "SetPixelFormat: Failed to select a pixel format!";
+			winxErrorMsg = (char*) "SetPixelFormat: Failed to select a pixel format!";
 			return false;
 		}
 
 		winx->context = wglCreateContextAttribsARB(winx->device, 0, contextAttributes);
 		if (!winx->context) {
-			__winx_msg = (char*) "wglCreateContextAttribsARB: Failed to create a render context!";
+			winxErrorMsg = (char*) "wglCreateContextAttribsARB: Failed to create a render context!";
 			return false;
 		}
 
 	} else {
-		__winx_msg = (char*) "wglChoosePixelFormatARB: Failed to choose a pixel format!";
+		winxErrorMsg = (char*) "wglChoosePixelFormatARB: Failed to choose a pixel format!";
 		return false;
 	}
 
@@ -787,14 +808,13 @@ bool winxOpen(int width, int height, const char* title) {
 	wglMakeCurrent(winx->device, winx->context);
 
 	// set vsync
-	if (wglSwapIntervalEXT && __winx_hint_vsync) {
-		wglSwapIntervalEXT(__winx_hint_vsync);
-	}
+	winxSetVsync(__winx_hint_vsync);
 
 	// finish window creation
 	ShowWindow(winx->hndl, 1);
 	UpdateWindow(winx->hndl);
 
+	return true;
 }
 
 void winxPollEvents() {
@@ -821,27 +841,74 @@ void winxClose() {
 }
 
 void winxSetTitle(const char* title) {
-	SetWindowTextA(winx->hndl, title);
+	if (winx) {
+		SetWindowTextA(winx->hndl, title);
+	} else {
+		winxErrorMsg = (char*) "winxSetTitle: No active winx context!";
+	}
 }
 
-void winxSetMouseHandle(WinxMouseEventHandle handle) {
-	if (winx != NULL) winx->mouse = handle;
-}
-
-void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
-	if (winx != NULL) winx->button = handle;
-}
-
-void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
-	if (winx != NULL) winx->keyboard = handle;
-}
-
-void winxSetScrollEventHandle(WinxScrollEventHandle handle) {
-	if (winx != NULL) winx->scroll = handle;
-}
-
-void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
-	if (winx != NULL) winx->close = handle;
+void winxSetVsync(int vsync) {
+	if (winx) {
+		if (wglSwapIntervalEXT) {
+			wglSwapIntervalEXT(__winx_hint_vsync);
+		}
+	} else {
+		winxErrorMsg = (char*) "winxSetVsync: No active winx context!";
+	}
 }
 
 #endif // WINAPI
+
+#if defined(WINX_IMPLEMENT)
+
+void winxSetMouseHandle(WinxMouseEventHandle handle) {
+	if (winx) {
+		winx->mouse = handle;
+	} else {
+		winxErrorMsg = (char*) "winxSetMouseHandle: No active winx context!";
+	}
+}
+
+void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
+	if (winx) {
+		winx->button = handle;
+	} else {
+		winxErrorMsg = (char*) "winxSetButtonEventHandle: No active winx context!";
+	}
+}
+
+void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
+	if (winx) {
+		winx->keyboard = handle;
+	} else {
+		winxErrorMsg = (char*) "winxSetKeybordEventHandle: No active winx context!";
+	}
+}
+
+void winxSetScrollEventHandle(WinxScrollEventHandle handle) {
+	if (winx) {
+		winx->scroll = handle;
+	} else {
+		winxErrorMsg = (char*) "winxSetScrollEventHandle: No active winx context!";
+	}
+}
+
+void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
+	if (winx) {
+		winx->close = handle;
+	} else {
+		winxErrorMsg = (char*) "winxSetCloseEventHandle: No active winx context!";
+	}
+}
+
+void winxSetResizeEventHandle(WinxResizeEventHandle handle) {
+	if (winx) {
+		winx->resize = handle;
+	} else {
+		winxErrorMsg = (char*) "winxSetResizeEventHandle: No active winx context!";
+	}
+}
+
+#endif // common
+

@@ -38,6 +38,10 @@ void closeEventHandle() {
 	exit(0);
 }
 
+void resizeEventHandle(int w, int h) {
+	glViewport(0, 0, w, h);
+}
+
 int main() {
 
 	if (!winxOpen(500, 300, "WINX OpenGL 3.0 Example")) {
@@ -52,6 +56,7 @@ int main() {
 	init();
 
 	winxSetCloseEventHandle(closeEventHandle);
+	winxSetResizeEventHandle(resizeEventHandle);
 
 	while(1) {
 		draw();

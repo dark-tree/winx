@@ -55,6 +55,9 @@ void winxSwapBuffers();
 /// used to close window
 void winxClose();
 
+/// set window title
+void winxSetTitle(const char* title);
+
 /// set the handle for mouse movement events, requires an open window
 void winxSetMouseHandle(WinxMouseEventHandle handle);
 
@@ -74,15 +77,18 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 #define WINX_RELEASED 0
 
 /// hint keys
-#define WINX_HINT_VSYNC        0x01
-#define WINX_HINT_RED_BITS     0x02
-#define WINX_HINT_GREEN_BITS   0x03
-#define WINX_HINT_BLUE_BITS    0x04
-#define WINX_HINT_ALPHA_BITS   0x05
-#define WINX_HINT_DEPTH_BITS   0x06
-#define WINX_HINT_OPENGL_MAJOR 0x07 // TODO GLX
-#define WINX_HINT_OPENGL_MINOR 0x08 // TODO GLX
-#define WINX_HINT_OPENGL_CORE  0x09 // TODO GLX
+#define WINX_HINT_VSYNC         0x01
+#define WINX_HINT_RED_BITS      0x02
+#define WINX_HINT_GREEN_BITS    0x03
+#define WINX_HINT_BLUE_BITS     0x04
+#define WINX_HINT_ALPHA_BITS    0x05
+#define WINX_HINT_DEPTH_BITS    0x06
+#define WINX_HINT_OPENGL_MAJOR  0x07
+#define WINX_HINT_OPENGL_MINOR  0x08
+#define WINX_HINT_OPENGL_CORE   0x09
+#define WINX_HINT_OPENGL_DEBUG  0x0A
+#define WINX_HINT_OPENGL_ROBUST 0x0B
+#define WINX_HINT_MULTISAMPLES  0x0C
 
 /// hint values
 #define WINX_VSYNC_DISABLED 0
@@ -124,6 +130,8 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 
 #if defined(WINX_IMPLEMENT)
 
+#define SET_HINT(HINT_ENUM, HINT_VAR) case HINT_ENUM: HINT_VAR = value; break;
+
 // dummy functions
 void WinxDummyMouseEventHandle(int x, int y) {}
 void WinxDummyButtonEventHandle(int type, int button) {}
@@ -141,6 +149,9 @@ int __winx_hint_depth_bits = 24;
 int __winx_hint_opengl_major = 3;
 int __winx_hint_opengl_minor = 0;
 int __winx_hint_opengl_core = 1;
+int __winx_hint_opengl_debug = 0;
+int __winx_hint_opengl_robust = 0;
+int __winx_hint_multisamples = 0;
 
 // current error message
 char* __winx_msg = NULL;
@@ -153,47 +164,23 @@ char* winxGetError() {
 }
 
 void winxHint(int hint, int value) {
-
 	switch (hint) {
-
-		case WINX_HINT_VSYNC:
-			__winx_hint_vsync = value;
-			break;
-
-		case WINX_HINT_RED_BITS:
-			__winx_hint_red_bits = value;
-			break;
-
-		case WINX_HINT_GREEN_BITS:
-			__winx_hint_green_bits = value;
-			break;
-
-		case WINX_HINT_BLUE_BITS:
-			__winx_hint_blue_bits = value;
-			break;
-
-		case WINX_HINT_ALPHA_BITS:
-			__winx_hint_alpha_bits = value;
-			break;
-
-		case WINX_HINT_DEPTH_BITS:
-			__winx_hint_depth_bits = value;
-			break;
-
-		case WINX_HINT_OPENGL_MAJOR:
-			__winx_hint_opengl_major = value;
-			break;
-
-		case WINX_HINT_OPENGL_MINOR:
-			__winx_hint_opengl_minor = value;
-			break;
-
-		case WINX_HINT_OPENGL_CORE:
-			__winx_hint_opengl_core = value;
-			break;
+		SET_HINT(WINX_HINT_VSYNC, __winx_hint_vsync);
+		SET_HINT(WINX_HINT_RED_BITS, __winx_hint_red_bits);
+		SET_HINT(WINX_HINT_GREEN_BITS,	__winx_hint_green_bits);
+		SET_HINT(WINX_HINT_BLUE_BITS, __winx_hint_blue_bits);
+		SET_HINT(WINX_HINT_ALPHA_BITS, __winx_hint_alpha_bits);
+		SET_HINT(WINX_HINT_DEPTH_BITS, __winx_hint_depth_bits);
+		SET_HINT(WINX_HINT_OPENGL_MAJOR, __winx_hint_opengl_major);
+		SET_HINT(WINX_HINT_OPENGL_MINOR, __winx_hint_opengl_minor);
+		SET_HINT(WINX_HINT_OPENGL_CORE, __winx_hint_opengl_core);
+		SET_HINT(WINX_HINT_OPENGL_DEBUG, __winx_hint_opengl_debug);
+		SET_HINT(WINX_HINT_OPENGL_ROBUST, __winx_hint_opengl_robust);
+		SET_HINT(WINX_HINT_MULTISAMPLES, __winx_hint_multisamples);
 	}
-
 }
+
+#undef SET_HINT
 
 #endif // common
 
@@ -206,8 +193,10 @@ void winxHint(int hint, int value) {
 
 // copied from glxext.h
 typedef int ( *PFNGLXSWAPINTERVALMESAPROC) (unsigned int interval);
+typedef GLXContext ( *PFNGLXCREATECONTEXTATTRIBSARBPROC) (Display *dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
 
 PFNGLXSWAPINTERVALMESAPROC glXSwapIntervalMESA;
+PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB;
 
 typedef struct {
 	Display* display;
@@ -223,6 +212,20 @@ typedef struct {
 } WinxHandle;
 
 WinxHandle* winx = NULL;
+
+__GLXextFuncPtr winxGetProc(char* name) {
+	if (__winx_msg == NULL) {
+		__GLXextFuncPtr proc = glXGetProcAddress(name);
+
+		if (proc == NULL) {
+			__winx_msg = "glXGetProcAddress: Failed to load function!";
+		}
+
+		return proc;
+	}
+
+	return NULL;
+}
 
 bool winxOpen(int width, int height, const char* title) {
 	winx = (WinxHandle*) malloc(sizeof(WinxHandle));
@@ -242,13 +245,16 @@ bool winxOpen(int width, int height, const char* title) {
 	}
 
 	// GLX attributes
-	int glx_attributes[] = {
-		GLX_RGBA,
+	int attributes[] = {
+		GLX_RENDER_TYPE, GLX_RGBA_BIT,
+        GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+        GLX_DOUBLEBUFFER, true,
 		GLX_RED_SIZE, __winx_hint_red_bits,
 		GLX_GREEN_SIZE, __winx_hint_green_bits,
 		GLX_BLUE_SIZE, __winx_hint_blue_bits,
-		GLX_DOUBLEBUFFER, true,
 		GLX_DEPTH_SIZE, __winx_hint_depth_bits,
+		GLX_SAMPLE_BUFFERS, __winx_hint_multisamples ? 1 : 0,
+		GLX_SAMPLES, __winx_hint_multisamples,
 		GLX_STENCIL_SIZE, 1,
 		None
 	};
@@ -256,10 +262,18 @@ bool winxOpen(int width, int height, const char* title) {
 	int screen = DefaultScreen(winx->display);
 	Window root = RootWindow(winx->display, screen);
 
-	// find visual based on glx_attributes
-	XVisualInfo* info = glXChooseVisual(winx->display, screen, glx_attributes);
-	if( !info ) {
-		__winx_msg = (char*) "glXChooseVisual: Failed to choose a visual!";
+	// find frame buffer config matching our attributes
+	int count;
+	GLXFBConfig *fbconfigs = glXChooseFBConfig(winx->display, screen, attributes, &count);
+	if (!fbconfigs || count == 0) {
+		__winx_msg = (char*) "glXChooseFBConfig: Failed to choose a frame buffer config!";
+		return false;
+	}
+
+	// find visual based on framebuffer's config
+	XVisualInfo* info = glXGetVisualFromFBConfig(winx->display, fbconfigs[0]);
+	if (!info) {
+		__winx_msg = (char*) "glXGetVisualFromFBConfig: Failed to choose a visual!";
 		return false;
 	}
 
@@ -276,29 +290,58 @@ bool winxOpen(int width, int height, const char* title) {
 	winx->window = XCreateWindow(winx->display, root, 0, 0, width, height, 0, info->depth, InputOutput, info->visual, mask, &x11_attributes);
 
 	// set name
-	XStoreName(winx->display, winx->window, title);
-    XSetIconName(winx->display, winx->window, title);
+	winxSetTitle(title);
+
+	// show X11 window
+	XMapWindow(winx->display, winx->window);
 
 	// create GLX context
-	winx->context = glXCreateContext(winx->display, info, NULL, 1);
-	if (!winx->context) {
+	GLXContext context = glXCreateContext(winx->display, info, NULL, 1);
+	if (!context) {
 		__winx_msg = (char*) "glXCreateContext: Failed to create GLX context!";
 		return false;
 	}
 
+	glXMakeCurrent(winx->display, winx->window, context);
+
+	glXCreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC) winxGetProc("glXCreateContextAttribsARB");
+	glXSwapIntervalMESA = (PFNGLXSWAPINTERVALMESAPROC) glXGetProcAddress("glXSwapIntervalMESA"); // optional
+
+	if (__winx_msg != NULL) {
+		return false;
+	}
+
+	glXMakeCurrent(winx->display, 0, 0);
+    glXDestroyContext(winx->display, context);
+
 	XFree(info);
 
-	// show X11 window
-	XMapWindow(winx->display, winx->window);
-	glXMakeCurrent(winx->display, winx->window, winx->context);
+	int flags = 0;
+
+	if (__winx_hint_opengl_debug) flags |= GLX_CONTEXT_DEBUG_BIT_ARB;
+	if (__winx_hint_opengl_robust) flags |= GLX_CONTEXT_ROBUST_ACCESS_BIT_ARB;
+
+	int context_attributes[] = {
+        GLX_CONTEXT_MAJOR_VERSION_ARB, __winx_hint_opengl_major,
+        GLX_CONTEXT_MINOR_VERSION_ARB, __winx_hint_opengl_minor,
+		GLX_CONTEXT_PROFILE_MASK_ARB, __winx_hint_opengl_core ? GLX_CONTEXT_CORE_PROFILE_BIT_ARB : GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+		GLX_CONTEXT_FLAGS_ARB, flags,
+        None
+    };
+
+	winx->context = glXCreateContextAttribsARB(winx->display, fbconfigs[0], NULL, true, context_attributes);
+    if (!winx->context) {
+		__winx_msg = "glXCreateContextAttribsARB: Failed to create context";
+        return false;
+    }
+
+    glXMakeCurrent(winx->display, winx->window, winx->context);
 
 	// needed to handle the close button
 	winx->WM_DELETE_WINDOW = XInternAtom(winx->display, "WM_DELETE_WINDOW", false);
 	XSetWMProtocols(winx->display, winx->window, &(winx->WM_DELETE_WINDOW), 1);
 
 	// try setting vsync
-	glXSwapIntervalMESA = (PFNGLXSWAPINTERVALMESAPROC) glXGetProcAddress("glXSwapIntervalMESA");
-
 	if (glXSwapIntervalMESA && __winx_hint_vsync) {
 		glXSwapIntervalMESA(__winx_hint_vsync);
 	}
@@ -371,6 +414,11 @@ void winxClose() {
 	winx = NULL;
 }
 
+void winxSetTitle(const char* title) {
+	XStoreName(winx->display, winx->window, title);
+    XSetIconName(winx->display, winx->window, title);
+}
+
 void winxSetMouseHandle(WinxMouseEventHandle handle) {
 	if (winx != NULL) winx->mouse = handle;
 }
@@ -425,6 +473,11 @@ typedef BOOL(WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
 #define WGL_SWAP_EXCHANGE_ARB             0x2028
 #define WGL_SWAP_METHOD_ARB               0x2007
 #define WGL_SWAP_COPY_ARB                 0x2029
+#define WGL_CONTEXT_FLAGS_ARB             0x2094
+#define WGL_CONTEXT_DEBUG_BIT_ARB         0x00000001
+#define WGL_CONTEXT_ROBUST_ACCESS_BIT_ARB 0x00000004
+#define WGL_SAMPLE_BUFFERS_ARB            0x2041
+#define WGL_SAMPLES_ARB                   0x2042
 
 PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT;
 
@@ -442,7 +495,7 @@ typedef struct {
 
 WinxHandle* winx = NULL;
 
-PROC winxGetWglProc(LPCSTR name) {
+PROC winxGetProc(LPCSTR name) {
 	if (__winx_msg == NULL) {
 		PROC proc = wglGetProcAddress(name);
 
@@ -614,12 +667,12 @@ bool winxOpen(int width, int height, const char* title) {
 		return false;
 	}
 
-	wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC) winxGetWglProc("wglChoosePixelFormatARB");
-	wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC) winxGetWglProc("wglCreateContextAttribsARB");
+	wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC) winxGetProc("wglChoosePixelFormatARB");
+	wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC) winxGetProc("wglCreateContextAttribsARB");
 	wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC) wglGetProcAddress("wglSwapIntervalEXT"); // optional
 
 	if (__winx_msg != NULL) {
-		// winxGetWglProc set the error message
+		// winxGetProc set the error message
 		return false;
 	}
 
@@ -636,13 +689,21 @@ bool winxOpen(int width, int height, const char* title) {
 		WGL_COLOR_BITS_ARB, __winx_hint_color_bits,
 		WGL_ALPHA_BITS_ARB, __winx_hint_alpha_bits,
 		WGL_DEPTH_BITS_ARB, __winx_hint_depth_bits,
+		WGL_SAMPLE_BUFFERS_ARB, __winx_hint_multisamples ? 1 : 0,
+		WGL_SAMPLES_ARB, __winx_hint_multisamples,
 		0
 	};
+
+	int flags = 0;
+
+	if (__winx_hint_opengl_debug) flags |= WGL_CONTEXT_DEBUG_BIT_ARB;
+	if (__winx_hint_opengl_robust) flags |= WGL_CONTEXT_ROBUST_ACCESS_BIT_ARB;
 
 	int  contextAttributes[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, __winx_hint_opengl_major,
 		WGL_CONTEXT_MINOR_VERSION_ARB, __winx_hint_opengl_minor,
 		WGL_CONTEXT_PROFILE_MASK_ARB, __winx_hint_opengl_core ? WGL_CONTEXT_CORE_PROFILE_BIT_ARB : WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+		WGL_CONTEXT_FLAGS_ARB, flags,
 		0
 	};
 
@@ -713,6 +774,10 @@ void winxClose() {
 
 	free(winx);
 	winx = NULL;
+}
+
+void winxSetTitle(const char* title) {
+	SetWindowTextA(winx->hndl, title);
 }
 
 void winxSetMouseHandle(WinxMouseEventHandle handle) {

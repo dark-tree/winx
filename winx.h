@@ -62,6 +62,9 @@
  *	To close the window call 'winxClose'. Note that this doesn't reset any modified window hints!
  */
 
+#ifndef WINX_H
+#define WINX_H
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -171,4 +174,6 @@ void winxSetResizeEventHandle(WinxResizeEventHandle handle);
 #	define WXB_RIGHT 3
 
 #endif
+
+#endif // WINX_H
 

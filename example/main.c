@@ -1,10 +1,6 @@
 
 #include "glad/glad.h"
-
-#define WINX_IMPLEMENT
 #include <winx.h>
-
-#include "glad/glad.c"
 #include <stdio.h>
 #include <sys/time.h>
 

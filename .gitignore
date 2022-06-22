@@ -1,2 +1,4 @@
 main
 main.exe
+wxgl/wxgl.h
+wxgl/wxgl.c

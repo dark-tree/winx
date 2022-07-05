@@ -2,6 +2,8 @@
 #include "winx.h"
 
 #define SET_HINT(HINT_ENUM, HINT_VAR) case HINT_ENUM: HINT_VAR = value; break;
+#define WINX_CONTEXT_ASSERT(function) if(!winx) { winxErrorMsg = (char*) (function ": No active winx context!"); return; }
+
 
 // dummy functions
 void WinxDummyMouseEventHandle(int x, int y) {}
@@ -69,15 +71,17 @@ typedef int ( *PFNGLXSWAPINTERVALMESAPROC) (unsigned int interval);
 typedef void ( *PFNGLXSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawable, int interval);
 typedef GLXContext ( *PFNGLXCREATECONTEXTATTRIBSARBPROC) (Display *dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
 
-PFNGLXSWAPINTERVALMESAPROC glXSwapIntervalMESA;
-PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT;
-PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB;
+static PFNGLXSWAPINTERVALMESAPROC glXSwapIntervalMESA;
+static PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT;
+static PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB;
 
 typedef struct {
 	Display* display;
 	Window window;
 	GLXContext context;
-	Atom WM_DELETE_WINDOW;
+	Atom wm_delete_window;
+	Atom net_wm_icon;
+	Atom cardinal;
 
 	WinxMouseEventHandle mouse;
 	WinxButtonEventHandle button;
@@ -87,7 +91,7 @@ typedef struct {
 	WinxResizeEventHandle resize;
 } WinxHandle;
 
-WinxHandle* winx = NULL;
+static WinxHandle* winx = NULL;
 
 static __GLXextFuncPtr winxGetProc(const char* name) {
 	if (winxErrorMsg == NULL) {
@@ -215,9 +219,13 @@ bool winxOpen(int width, int height, const char* title) {
 
 	glXMakeCurrent(winx->display, winx->window, winx->context);
 
+	// needed for window icon
+	winx->net_wm_icon = XInternAtom(winx->display, "_NET_WM_ICON", false);
+    winx->cardinal = XInternAtom(winx->display, "CARDINAL", false);
+
 	// needed to handle the close button
-	winx->WM_DELETE_WINDOW = XInternAtom(winx->display, "WM_DELETE_WINDOW", false);
-	XSetWMProtocols(winx->display, winx->window, &(winx->WM_DELETE_WINDOW), 1);
+	winx->wm_delete_window = XInternAtom(winx->display, "WM_DELETE_WINDOW", false);
+	XSetWMProtocols(winx->display, winx->window, &(winx->wm_delete_window), 1);
 
 	// set vsync
 	winxSetVsync(__winx_hint_vsync);
@@ -239,7 +247,7 @@ void winxPollEvents() {
 		switch (event.type) {
 
 			case ClientMessage:
-				if (event.xclient.data.l[0] == winx->WM_DELETE_WINDOW) {
+				if (event.xclient.data.l[0] == winx->wm_delete_window) {
 					winx->close();
 					break;
 				}
@@ -300,25 +308,42 @@ void winxClose() {
 }
 
 void winxSetTitle(const char* title) {
-	if (winx) {
-		XStoreName(winx->display, winx->window, title);
-		XSetIconName(winx->display, winx->window, title);
-	} else {
-		winxErrorMsg = (char*) "winxSetTitle: No active winx context!";
+	WINX_CONTEXT_ASSERT("winxSetTitle");
+
+	XStoreName(winx->display, winx->window, title);
+	XSetIconName(winx->display, winx->window, title);
+}
+
+void winxSetIcon(int width, int height, unsigned char* buffer) {
+	WINX_CONTEXT_ASSERT("winxSetIcon");
+
+	// We need to convert RGBA byte array to a suported format
+	// X11 expects the icon in format [[long: width] [long: height] [long: bgra]...]...
+
+	const int size = width * height;
+	unsigned long* icon = (unsigned long*) malloc(sizeof(long) * (size + 2));
+
+	icon[0] = width;
+	icon[1] = height;
+
+	for (int i = 0, j = 2; i < size * 4; i += 4) {
+		icon[j ++] = buffer[i + 2] | buffer[i + 1] << 8 | buffer[i + 0] << 16 | buffer[i + 3] << 24;
 	}
+
+	XChangeProperty(winx->display, winx->window, winx->net_wm_icon, winx->cardinal, 32, PropModeReplace, (const unsigned char*) icon, size + 2);
+
+	free(icon);
 }
 
 void winxSetVsync(int vsync) {
-	if (winx) {
-		if (glXSwapIntervalEXT) {
-			glXSwapIntervalEXT(winx->display, glXGetCurrentDrawable(), __winx_hint_vsync);
-		} else {
-			if (glXSwapIntervalMESA) {
-				glXSwapIntervalMESA(__winx_hint_vsync == WINX_VSYNC_ADAPTIVE ? WINX_VSYNC_ENABLED : __winx_hint_vsync);
-			}
-		}
+	WINX_CONTEXT_ASSERT("winxSetVsync");
+
+	if (glXSwapIntervalEXT) {
+		glXSwapIntervalEXT(winx->display, glXGetCurrentDrawable(), __winx_hint_vsync);
 	} else {
-		winxErrorMsg = (char*) "winxSetVsync: No active winx context!";
+		if (glXSwapIntervalMESA) {
+			glXSwapIntervalMESA(__winx_hint_vsync == WINX_VSYNC_ADAPTIVE ? WINX_VSYNC_ENABLED : __winx_hint_vsync);
+		}
 	}
 }
 
@@ -366,7 +391,7 @@ typedef BOOL(WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
 #define WGL_BLUE_BITS_ARB                 0x2019
 #define WGL_STENCIL_BITS_ARB              0x2023
 
-PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT;
+static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT;
 
 typedef struct {
 	HWND hndl;
@@ -381,7 +406,7 @@ typedef struct {
 	WinxResizeEventHandle resize;
 } WinxHandle;
 
-WinxHandle* winx = NULL;
+static WinxHandle* winx = NULL;
 
 static PROC winxGetProc(LPCSTR name) {
 	if (winxErrorMsg == NULL) {
@@ -677,70 +702,124 @@ void winxClose() {
 }
 
 void winxSetTitle(const char* title) {
-	if (winx) {
-		SetWindowTextA(winx->hndl, title);
+	WINX_CONTEXT_ASSERT("winxSetTitle");
+
+	SetWindowTextA(winx->hndl, title);
+}
+
+void winxSetIcon(int width, int height, unsigned char* buffer) {
+	WINX_CONTEXT_ASSERT("winxSetIcon");
+
+	HICON largeIcon, smallIcon;
+
+	if (!buffer) {
+
+		largeIcon = (HICON) GetClassLongPtrW(winx->hndl, GCLP_HICON);
+        smallIcon = (HICON) GetClassLongPtrW(winx->hndl, GCLP_HICONSM);
+
 	} else {
-		winxErrorMsg = (char*) "winxSetTitle: No active winx context!";
+
+		char* target = NULL;
+		BITMAPV5HEADER header = {0};
+
+		header.bV5Size        = sizeof(header);
+		header.bV5Width       = width;
+		header.bV5Height      = -height;
+		header.bV5Planes      = 1;
+		header.bV5BitCount    = 32;
+		header.bV5Compression = BI_BITFIELDS;
+
+		// the order needs to be presisly like that
+		// otherwise alpha doesn't work
+		header.bV5RedMask     = 0x00ff0000;
+		header.bV5GreenMask   = 0x0000ff00;
+		header.bV5BlueMask    = 0x000000ff;
+		header.bV5AlphaMask   = 0xff000000;
+
+		HDC dc = GetDC(NULL);
+
+		if (!dc) {
+			winxErrorMsg = (char*) "GetDC: Failed to acquire drawable!";
+			return;
+		}
+
+		HBITMAP mask = CreateBitmap(width, height, 1, 1, NULL);
+		HBITMAP color = CreateDIBSection(dc, (BITMAPINFO*) &header, DIB_RGB_COLORS, (void**) &target, NULL, 0);
+		ReleaseDC(NULL, dc);
+
+		for (int i = 0; i < width * height;  i++) {
+			target[0] = buffer[0];
+			target[1] = buffer[1];
+			target[2] = buffer[2];
+			target[3] = buffer[3];
+
+			target += 4;
+			buffer += 4;
+		}
+
+		ICONINFO info = {0};
+		info.fIcon = TRUE;
+		info.xHotspot = 0;
+		info.yHotspot = 0;
+		info.hbmMask = mask;
+		info.hbmColor = color;
+
+		HICON icon = CreateIconIndirect(&info);
+
+		DeleteObject(color);
+		DeleteObject(mask);
+
+		if (!icon) {
+			winxErrorMsg = (char*) "CreateIconIndirect: Failed to create icon handle!";
+			return;
+		}
+
+		largeIcon = icon;
+		smallIcon = icon;
+
 	}
+
+	SendMessage(winx->hndl, WM_SETICON, ICON_BIG, (LPARAM) largeIcon);
+	SendMessage(winx->hndl, WM_SETICON, ICON_SMALL, (LPARAM) smallIcon);
 }
 
 void winxSetVsync(int vsync) {
-	if (winx) {
-		if (wglSwapIntervalEXT) {
-			wglSwapIntervalEXT(__winx_hint_vsync);
-		}
-	} else {
-		winxErrorMsg = (char*) "winxSetVsync: No active winx context!";
+	WINX_CONTEXT_ASSERT("winxSetVsync");
+
+	if (wglSwapIntervalEXT) {
+		wglSwapIntervalEXT(__winx_hint_vsync);
 	}
 }
 
 #endif // WINAPI
 
 void winxSetMouseHandle(WinxMouseEventHandle handle) {
-	if (winx) {
-		winx->mouse = handle;
-	} else {
-		winxErrorMsg = (char*) "winxSetMouseHandle: No active winx context!";
-	}
+	WINX_CONTEXT_ASSERT("winxSetMouseHandle");
+	winx->mouse = handle;
 }
 
 void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
-	if (winx) {
-		winx->button = handle;
-	} else {
-		winxErrorMsg = (char*) "winxSetButtonEventHandle: No active winx context!";
-	}
+	WINX_CONTEXT_ASSERT("winxSetButtonEventHandle");
+	winx->button = handle;
 }
 
 void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
-	if (winx) {
-		winx->keyboard = handle;
-	} else {
-		winxErrorMsg = (char*) "winxSetKeybordEventHandle: No active winx context!";
-	}
+	WINX_CONTEXT_ASSERT("winxSetKeybordEventHandle");
+	winx->keyboard = handle;
 }
 
 void winxSetScrollEventHandle(WinxScrollEventHandle handle) {
-	if (winx) {
-		winx->scroll = handle;
-	} else {
-		winxErrorMsg = (char*) "winxSetScrollEventHandle: No active winx context!";
-	}
+	WINX_CONTEXT_ASSERT("winxSetScrollEventHandle");
+	winx->scroll = handle;
 }
 
 void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
-	if (winx) {
-		winx->close = handle;
-	} else {
-		winxErrorMsg = (char*) "winxSetCloseEventHandle: No active winx context!";
-	}
+	WINX_CONTEXT_ASSERT("winxSetCloseEventHandle");
+	winx->close = handle;
 }
 
 void winxSetResizeEventHandle(WinxResizeEventHandle handle) {
-	if (winx) {
-		winx->resize = handle;
-	} else {
-		winxErrorMsg = (char*) "winxSetResizeEventHandle: No active winx context!";
-	}
+	WINX_CONTEXT_ASSERT("winxSetResizeEventHandle");
+	winx->resize = handle;
 }
 

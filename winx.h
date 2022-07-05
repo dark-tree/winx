@@ -97,6 +97,9 @@ void winxClose();
 /// set title for current window
 void winxSetTitle(const char* title);
 
+/// set the icon of this window to a RGBA image, pass NULL to revert
+void winxSetIcon(int width, int height, unsigned char* buffer);
+
 /// set desired vsync behaviour for current window
 void winxSetVsync(int vsync);
 

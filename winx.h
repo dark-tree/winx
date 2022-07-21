@@ -69,12 +69,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-typedef void (*WinxMouseEventHandle)(int, int);
-typedef void (*WinxButtonEventHandle)(int, int);
-typedef void (*WinxKeybordEventHandle)(int, int);
-typedef void (*WinxScrollEventHandle)(int);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef void (*WinxMouseEventHandle)(int x, int y);
+typedef void (*WinxButtonEventHandle)(int state, int button);
+typedef void (*WinxKeybordEventHandle)(int state, int keycode);
+typedef void (*WinxScrollEventHandle)(int scroll);
 typedef void (*WinxCloseEventHandle)(void);
-typedef void (*WinxResizeEventHandle)(int, int);
+typedef void (*WinxResizeEventHandle)(int width, int height);
 
 /// set a window hint, has to be called prior to winxOpen()
 void winxHint(int hint, int value);
@@ -147,35 +151,41 @@ void winxSetResizeEventHandle(WinxResizeEventHandle handle);
 #if defined(__unix__) || defined(__linux__)
 #	define WINX_GLX
 
-#	define WXK_SPACE ' '
-#	define WXK_TAB '\t'
-#	define WXK_ESC XK_Escape
-#	define WXK_ENTER XK_Return
-#	define WXK_BACK XK_BackSpace
-#	define WXK_UP XK_Up
-#	define WXK_DOWN XK_Down
-#	define WXK_LEFT XK_Left
-#	define WXK_RIGHT XK_Right
-#	define WXB_LEFT Button1
-#	define WXB_CENTER Button2
-#	define WXB_RIGHT Button3
+// based on https://code.woboq.org/kde/include/X11/keysymdef.h.html
+#	define WXK_SPACE    ' '
+#	define WXK_TAB 		'\t'
+#	define WXK_ESC      0xff1b // XK_Escape
+#	define WXK_ENTER    0xff0d // XK_Return
+#	define WXK_BACK     0xff08 // XK_BackSpace
+#	define WXK_UP       0xff52 // XK_Up
+#	define WXK_DOWN     0xff54 // XK_Down
+#	define WXK_LEFT     0xff51 // XK_Left
+#	define WXK_RIGHT    0xff53 // XK_Right
+#	define WXB_LEFT     1 // Button1 (X.h)
+#	define WXB_CENTER   2 // Button2 (X.h)
+#	define WXB_RIGHT    3 // Button3 (X.h)
 
 #elif defined(_WIN32) || defined(_WIN64)
 #	define WINX_WINAPI
 
-#	define WXK_SPACE ' '
-#	define WXK_TAB '\t'
-#	define WXK_ESC VK_ESCAPE
-#	define WXK_ENTER VK_RETURN
-#	define WXK_BACK VK_BACK
-#	define WXK_UP VK_UP
-#	define WXK_DOWN VK_DOWN
-#	define WXK_LEFT VK_LEFT
-#	define WXK_RIGHT VK_RIGHT
-#	define WXB_LEFT 1
-#	define WXB_CENTER 2
-#	define WXB_RIGHT 3
+// based on https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+#	define WXK_SPACE    ' '
+#	define WXK_TAB      '\t'
+#	define WXK_ESC      0x1B // VK_ESCAPE
+#	define WXK_ENTER    0x0D // VK_RETURN
+#	define WXK_BACK     0x08 // VK_BACK
+#	define WXK_UP       0x26 // VK_UP
+#	define WXK_DOWN     0x28 // VK_DOWN
+#	define WXK_LEFT     0x25 // VK_LEFT
+#	define WXK_RIGHT    0x27 // VK_RIGHT
+#	define WXB_LEFT     1
+#	define WXB_CENTER   2
+#	define WXB_RIGHT    3
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif // WINX_H

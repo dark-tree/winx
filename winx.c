@@ -475,7 +475,7 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 			break;
 
 		default:
-			result = DefWindowProc(hWnd, message, wParam, lParam);
+			result = DefWindowProcA(hWnd, message, wParam, lParam);
 	}
 
 	return result;
@@ -497,8 +497,7 @@ bool winxOpen(int width, int height, const char* title) {
 	// register window class
 	const char* clazz = "WinxOpenGLClass";
 
-	WNDCLASSEX wcex;
-	memset(&wcex, 0, sizeof(wcex));
+	WNDCLASSEXA wcex = {0};
 	wcex.cbSize = sizeof(WNDCLASSEX);
 	wcex.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
 	wcex.lpfnWndProc = (WNDPROC) winxWndProc;
@@ -512,8 +511,8 @@ bool winxOpen(int width, int height, const char* title) {
 	wcex.lpszClassName = clazz;
 	wcex.hIconSm = NULL;
 
-	if (!RegisterClassEx(&wcex)) {
-		winxErrorMsg = (char*) "RegisterClassEx: Failed to register window class!";
+	if (!RegisterClassExA(&wcex)) {
+		winxErrorMsg = (char*) "RegisterClassExA: Failed to register window class!";
 		return false;
 	}
 
@@ -522,9 +521,9 @@ bool winxOpen(int width, int height, const char* title) {
 	HGLRC fakeRenderContext;
 
 	// create temporary window to get WGL context
-	fakeHndl = CreateWindow(clazz, "WINX", WS_OVERLAPPEDWINDOW, 0, 0, 1, 1, NULL, NULL, hinstance, NULL);
+	fakeHndl = CreateWindowA(clazz, "WINX", WS_OVERLAPPEDWINDOW, 0, 0, 1, 1, NULL, NULL, hinstance, NULL);
 	if (!fakeHndl) {
-		winxErrorMsg = (char*) "CreateWindow: Failed to create temporary window!";
+		winxErrorMsg = (char*) "CreateWindowA: Failed to create temporary window!";
 		return false;
 	}
 
@@ -534,8 +533,7 @@ bool winxOpen(int width, int height, const char* title) {
 		return false;
 	}
 
-	PIXELFORMATDESCRIPTOR descriptor;
-	memset(&descriptor, 0, sizeof(PIXELFORMATDESCRIPTOR));
+	PIXELFORMATDESCRIPTOR descriptor = {0};
 	descriptor.nSize = sizeof(PIXELFORMATDESCRIPTOR);
 	descriptor.nVersion = 1;
 	descriptor.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL;
@@ -564,9 +562,9 @@ bool winxOpen(int width, int height, const char* title) {
 	}
 
 	// open real window
-	winx->hndl = CreateWindow(clazz, title, WS_OVERLAPPEDWINDOW, 0, 0, width, height, NULL, NULL, hinstance, NULL);
+	winx->hndl = CreateWindowA(clazz, title, WS_OVERLAPPEDWINDOW, 0, 0, width, height, NULL, NULL, hinstance, NULL);
 	if (!winx->hndl) {
-		winxErrorMsg = (char*) "CreateWindow: Failed to create window!";
+		winxErrorMsg = (char*) "CreateWindowA: Failed to create window!";
 		return false;
 	}
 

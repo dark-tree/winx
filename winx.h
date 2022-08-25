@@ -65,6 +65,8 @@
 #ifndef WINX_H
 #define WINX_H
 
+#define WINX_VERSION "1.0.0"
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>

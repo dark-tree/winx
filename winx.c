@@ -4,7 +4,6 @@
 #define SET_HINT(HINT_ENUM, HINT_VAR) case HINT_ENUM: HINT_VAR = value; break;
 #define WINX_CONTEXT_ASSERT(function) if(!winx) { winxErrorMsg = (char*) (function ": No active winx context!"); return; }
 
-
 // dummy functions
 void WinxDummyMouseEventHandle(int x, int y) {}
 void WinxDummyButtonEventHandle(int type, int button) {}
@@ -58,7 +57,6 @@ void winxHint(int hint, int value) {
 
 #undef SET_HINT
 
-
 // begin winx GLX implementation
 #if defined(WINX_GLX)
 
@@ -75,6 +73,7 @@ static PFNGLXSWAPINTERVALMESAPROC glXSwapIntervalMESA;
 static PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT;
 static PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB;
 
+// winx global state struct
 typedef struct {
 	Display* display;
 	Window window;
@@ -111,12 +110,7 @@ bool winxOpen(int width, int height, const char* title) {
 	winx = (WinxHandle*) malloc(sizeof(WinxHandle));
 
 	// set dummy function pointers
-	winx->button = WinxDummyButtonEventHandle;
-	winx->mouse = WinxDummyMouseEventHandle;
-	winx->keyboard = WinxDummyKeybordEventHandle;
-	winx->scroll = WinxDummyScrollEventHandle;
-	winx->close = WinxDummyCloseEventHandle;
-	winx->resize = WinxDummyResizeEventHandle;
+	winxResetEventHandles();
 
 	// get display handle
 	winx->display = XOpenDisplay(NULL);
@@ -388,6 +382,7 @@ typedef BOOL(WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
 
 static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT;
 
+// winx global state struct
 typedef struct {
 	HWND hndl;
 	HDC device;
@@ -482,12 +477,7 @@ bool winxOpen(int width, int height, const char* title) {
 	HINSTANCE hinstance = GetModuleHandle(NULL);
 
 	// set dummy function pointers
-	winx->button = WinxDummyButtonEventHandle;
-	winx->mouse = WinxDummyMouseEventHandle;
-	winx->keyboard = WinxDummyKeybordEventHandle;
-	winx->scroll = WinxDummyScrollEventHandle;
-	winx->close = WinxDummyCloseEventHandle;
-	winx->resize = WinxDummyResizeEventHandle;
+	winxResetEventHandles();
 
 	// register window class
 	const char* clazz = "WinxOpenGLClass";
@@ -781,8 +771,8 @@ void winxSetVsync(int vsync) {
 
 #endif // WINAPI
 
-void winxSetMouseHandle(WinxMouseEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetMouseHandle");
+void winxSetMouseEventHandle(WinxMouseEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetMouseEventHandle");
 	winx->mouse = handle;
 }
 
@@ -809,5 +799,15 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
 void winxSetResizeEventHandle(WinxResizeEventHandle handle) {
 	WINX_CONTEXT_ASSERT("winxSetResizeEventHandle");
 	winx->resize = handle;
+}
+
+void winxResetEventHandles() {
+	WINX_CONTEXT_ASSERT("winxResetEventHandles");
+	winx->button = WinxDummyButtonEventHandle;
+	winx->mouse = WinxDummyMouseEventHandle;
+	winx->keyboard = WinxDummyKeybordEventHandle;
+	winx->scroll = WinxDummyScrollEventHandle;
+	winx->close = WinxDummyCloseEventHandle;
+	winx->resize = WinxDummyResizeEventHandle;
 }
 

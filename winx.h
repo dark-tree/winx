@@ -110,7 +110,7 @@ void winxSetIcon(int width, int height, unsigned char* buffer);
 void winxSetVsync(int vsync);
 
 /// set the handle for mouse movement events for current window
-void winxSetMouseHandle(WinxMouseEventHandle handle);
+void winxSetMouseEventHandle(WinxMouseEventHandle handle);
 
 /// set the handle for mouse click events for current window
 void winxSetButtonEventHandle(WinxButtonEventHandle handle);
@@ -126,6 +126,9 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 
 /// set the handle for window resize event for current window
 void winxSetResizeEventHandle(WinxResizeEventHandle handle);
+
+/// reset all even handlers for current window
+void winxResetEventHandles();
 
 #define WINX_PRESSED 1
 #define WINX_RELEASED 0

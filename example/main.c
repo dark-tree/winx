@@ -47,8 +47,6 @@ int main() {
 	}
 
 	// use GLAD to load OpenGL functions
-	// if you are using WXGL this is not required
-	// as then this function is called from within winxOpen()
 	gladLoadGL();
 
 	// init OpenGL example

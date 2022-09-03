@@ -12,7 +12,5 @@
 #include "wxgl.h"
 #undef WXGL_EXPOSE_WINX
 
-#define WINX_CREATION_HOOK gladLoadGL()
-
 //REPLACE_WINX_SOURCE//
 

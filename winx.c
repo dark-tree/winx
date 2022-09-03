@@ -230,11 +230,6 @@ bool winxOpen(int width, int height, const char* title) {
 	// set vsync
 	winxSetVsync(__winx_hint_vsync);
 
-	// call creation hook
-	#ifdef WINX_CREATION_HOOK
-	WINX_CREATION_HOOK;
-	#endif
-
 	return true;
 }
 
@@ -667,11 +662,6 @@ bool winxOpen(int width, int height, const char* title) {
 	// finish window creation
 	ShowWindow(winx->hndl, 1);
 	UpdateWindow(winx->hndl);
-
-	// call creation hook
-	#ifdef WINX_CREATION_HOOK
-	WINX_CREATION_HOOK;
-	#endif
 
 	return true;
 }

@@ -62,6 +62,7 @@ void winxHint(int hint, int value) {
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
+#include <X11/Xcursor/Xcursor.h>
 #include <GL/glx.h>
 
 // copied from glxext.h
@@ -73,6 +74,11 @@ static PFNGLXSWAPINTERVALMESAPROC glXSwapIntervalMESA;
 static PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT;
 static PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB;
 
+// winx cursor image struct
+struct WinxCursor_s {
+	Cursor native;
+};
+
 // winx global state struct
 typedef struct {
 	Display* display;
@@ -82,6 +88,8 @@ typedef struct {
 	Atom net_wm_icon;
 	Atom cardinal;
 
+	bool mouse_capture;
+	WinxCursor* cursor;
 	WinxMouseEventHandle mouse;
 	WinxButtonEventHandle button;
 	WinxKeybordEventHandle keyboard;
@@ -106,8 +114,24 @@ static __GLXextFuncPtr winxGetProc(const char* name) {
 	return NULL;
 }
 
+static void winxUpdateMouseState(bool captured, WinxCursor* cursor) {
+	if (captured) {
+		unsigned int events = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+		XGrabPointer(winx->display, winx->window, true, events, GrabModeAsync, GrabModeAsync, winx->window, None, CurrentTime);
+	} else {
+		XUngrabPointer(winx->display, CurrentTime);
+	}
+
+	if (cursor) {
+		XDefineCursor(winx->display, winx->window, cursor->native);
+	} else {
+		XUndefineCursor(winx->display, winx->window);
+	}
+}
+
 bool winxOpen(int width, int height, const char* title) {
 	winx = (WinxHandle*) malloc(sizeof(WinxHandle));
+	winx->mouse_capture = false;
 
 	// set dummy function pointers
 	winxResetEventHandles();
@@ -157,7 +181,9 @@ bool winxOpen(int width, int height, const char* title) {
 	x11_attributes.background_pixel = 0;
 	x11_attributes.border_pixel = 0;
 	x11_attributes.colormap = XCreateColormap(winx->display, root, info->visual, AllocNone);
-	x11_attributes.event_mask = StructureNotifyMask | ExposureMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask;
+
+	x11_attributes.event_mask =
+		StructureNotifyMask | ExposureMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | FocusChangeMask;
 
 	unsigned long mask = CWBackPixel | CWBorderPixel | CWColormap | CWEventMask;
 
@@ -228,7 +254,7 @@ bool winxOpen(int width, int height, const char* title) {
 }
 
 void winxPollEvents() {
-	while( XPending(winx->display) > 0 ) {
+	while (XPending(winx->display) > 0) {
 
 		XEvent event;
 		XNextEvent(winx->display, &event);
@@ -273,6 +299,14 @@ void winxPollEvents() {
 
 			case ConfigureNotify:
 				winx->resize(event.xconfigure.width, event.xconfigure.height);
+				break;
+
+			case FocusIn:
+				winxUpdateMouseState(winx->mouse_capture, winx->cursor);
+				break;
+
+			case FocusOut:
+				winxUpdateMouseState(false, NULL);
 				break;
 
 			default:
@@ -324,6 +358,44 @@ void winxSetIcon(int width, int height, unsigned char* buffer) {
 	free(icon);
 }
 
+WinxCursor* winxCreateCursorIcon(int width, int height, unsigned char* buffer, int x, int y) {
+	if (buffer == NULL) {
+		return NULL;
+	}
+
+	if (!winx) {
+		winxErrorMsg = (char*) "winxCreateCursorIcon: No active winx context!";
+		return NULL;
+	}
+
+	XcursorImage* image = XcursorImageCreate(width, height);
+	if (!image) {
+		winxErrorMsg = (char*) "XcursorImageCreate: Failed to create cursor image!";
+		return NULL;
+	}
+
+	image->xhot = x;
+	image->yhot = y;
+	XcursorPixel* pixels = image->pixels;
+
+	for (int i = 0, j = 0; i < width * height * 4; i += 4) {
+		pixels[j ++] = buffer[i + 2] | buffer[i + 1] << 8 | buffer[i + 0] << 16 | buffer[i + 3] << 24;
+	}
+
+	WinxCursor* cursor = (WinxCursor*) malloc(sizeof(WinxCursor));
+	cursor->native = XcursorImageLoadCursor(winx->display, image);
+    XcursorImageDestroy(image);
+
+	return cursor;
+}
+
+void winxDeleteCursorIcon(WinxCursor* cursor) {
+	if (cursor) {
+		XFreeCursor(winx->display, cursor->native);
+		free(cursor);
+	}
+}
+
 void winxSetVsync(int vsync) {
 	WINX_CONTEXT_ASSERT("winxSetVsync");
 
@@ -334,6 +406,19 @@ void winxSetVsync(int vsync) {
 			glXSwapIntervalMESA(__winx_hint_vsync == WINX_VSYNC_ADAPTIVE ? WINX_VSYNC_ENABLED : __winx_hint_vsync);
 		}
 	}
+}
+
+bool winxGetFocus() {
+	if (!winx) {
+		winxErrorMsg = (char*) "winxGetFocus: No active winx context!";
+		return false;
+	}
+
+	Window focused;
+	int state;
+
+	XGetInputFocus(winx->display, &focused, &state);
+	return focused == winx->window;
 }
 
 #endif // GLX
@@ -388,6 +473,7 @@ typedef struct {
 	HDC device;
 	HGLRC context;
 
+	bool mouse_capture;
 	WinxMouseEventHandle mouse;
 	WinxButtonEventHandle button;
 	WinxKeybordEventHandle keyboard;
@@ -472,8 +558,9 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 }
 
 bool winxOpen(int width, int height, const char* title) {
-
 	winx = (WinxHandle*) malloc(sizeof(WinxHandle));
+	winx->mouse_capture = false;
+
 	HINSTANCE hinstance = GetModuleHandle(NULL);
 
 	// set dummy function pointers
@@ -809,5 +896,25 @@ void winxResetEventHandles() {
 	winx->scroll = WinxDummyScrollEventHandle;
 	winx->close = WinxDummyCloseEventHandle;
 	winx->resize = WinxDummyResizeEventHandle;
+}
+
+void winxSetMouseCapture(bool captured) {
+	WINX_CONTEXT_ASSERT("winxSetMouseCapture");
+	winx->mouse_capture = captured;
+
+	// if the window is not focused the even loop will set/unset it later
+	if (winxGetFocus()) {
+		winxUpdateMouseState(captured, winx->cursor);
+	}
+}
+
+void winxSetCursorIcon(WinxCursor* cursor) {
+	WINX_CONTEXT_ASSERT("winxSetCursorIcon");
+	winx->cursor = cursor;
+
+	// if the window is not focused the even loop will set/unset it later
+	if (winxGetFocus()) {
+		winxUpdateMouseState(winx->mouse_capture, cursor);
+	}
 }
 

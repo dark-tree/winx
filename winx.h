@@ -75,6 +75,8 @@
 extern "C" {
 #endif
 
+typedef struct WinxCursor_s WinxCursor;
+
 typedef void (*WinxMouseEventHandle)(int x, int y);
 typedef void (*WinxButtonEventHandle)(int state, int button);
 typedef void (*WinxKeybordEventHandle)(int state, int keycode);
@@ -109,6 +111,21 @@ void winxSetIcon(int width, int height, unsigned char* buffer);
 /// set desired vsync behaviour for current window
 void winxSetVsync(int vsync);
 
+/// check if the current window is focused
+bool winxGetFocus();
+
+/// constreain the mouse pointer to the current window
+void winxSetMouseCapture(bool capture);
+
+/// get the cursor icon for the mouse pointer from a RGBA image
+WinxCursor* winxCreateCursorIcon(int width, int height, unsigned char* buffer, int x, int y);
+
+/// free the allocated icon
+void winxDeleteCursorIcon(WinxCursor* cursor);
+
+/// set the cursor icon for the current window, pass NULL to revert
+void winxSetCursorIcon(WinxCursor* cursor);
+
 /// set the handle for mouse movement events for current window
 void winxSetMouseEventHandle(WinxMouseEventHandle handle);
 
@@ -127,7 +144,7 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 /// set the handle for window resize event for current window
 void winxSetResizeEventHandle(WinxResizeEventHandle handle);
 
-/// reset all even handlers for current window
+/// reset all even handles for current window
 void winxResetEventHandles();
 
 #define WINX_PRESSED 1

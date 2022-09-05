@@ -105,7 +105,7 @@ void winxClose();
 /// set title for current window
 void winxSetTitle(const char* title);
 
-/// set the icon of this window to a RGBA image, pass NULL to revert
+/// set the icon of this window to a RGBA image, pass WINX_ICON_DEFAULT to revert
 void winxSetIcon(int width, int height, unsigned char* buffer);
 
 /// set desired vsync behaviour for current window
@@ -120,10 +120,13 @@ void winxSetMouseCapture(bool capture);
 /// get the cursor icon for the mouse pointer from a RGBA image
 WinxCursor* winxCreateCursorIcon(int width, int height, unsigned char* buffer, int x, int y);
 
+/// get an empty cursor icon for the mouse pointer
+WinxCursor* winxCreateNullCursorIcon();
+
 /// free the allocated icon
 void winxDeleteCursorIcon(WinxCursor* cursor);
 
-/// set the cursor icon for the current window, pass NULL to revert
+/// set the cursor icon for the current window, accepts WINX_ICON_DEFAULT
 void winxSetCursorIcon(WinxCursor* cursor);
 
 /// set the handle for mouse movement events for current window
@@ -147,6 +150,7 @@ void winxSetResizeEventHandle(WinxResizeEventHandle handle);
 /// reset all even handles for current window
 void winxResetEventHandles();
 
+#define WINX_ICON_DEFAULT NULL
 #define WINX_PRESSED 1
 #define WINX_RELEASED 0
 

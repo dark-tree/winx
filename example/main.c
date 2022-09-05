@@ -41,15 +41,14 @@ void resizeEventHandle(int w, int h) {
 
 int main() {
 
-	if (!winxOpen(500, 300, "WINX OpenGL 3.0 Example")) {
+	if (!winxOpen(400, 300, "WINX OpenGL 3.0 Example")) {
 		printf("Error occured! %s\n", winxGetError());
 		exit(1);
 	}
 
 //	winxSetMouseCapture(true);
 
-	unsigned char pixels[16 * 16 * 4] = { 0 };
-    WinxCursor* cursor = winxCreateCursorIcon(16, 16, pixels, 0, 0);
+    WinxCursor* cursor = winxCreateNullCursorIcon();
 	winxSetCursorIcon(cursor);
 
 	// use GLAD to load OpenGL functions

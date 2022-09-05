@@ -359,10 +359,6 @@ void winxSetIcon(int width, int height, unsigned char* buffer) {
 }
 
 WinxCursor* winxCreateCursorIcon(int width, int height, unsigned char* buffer, int x, int y) {
-	if (buffer == NULL) {
-		return NULL;
-	}
-
 	if (!winx) {
 		winxErrorMsg = (char*) "winxCreateCursorIcon: No active winx context!";
 		return NULL;
@@ -387,6 +383,11 @@ WinxCursor* winxCreateCursorIcon(int width, int height, unsigned char* buffer, i
     XcursorImageDestroy(image);
 
 	return cursor;
+}
+
+WinxCursor* winxCreateNullCursorIcon() {
+	unsigned char pixels[1 * 1 * 4] = {0, 0, 0, 0};
+	return winxCreateCursorIcon(1, 1, pixels, 0, 0);
 }
 
 void winxDeleteCursorIcon(WinxCursor* cursor) {
@@ -430,7 +431,7 @@ bool winxGetFocus() {
 #include <windowsx.h>
 #include <gl/GL.h>
 
-/* copied from wglext.h */
+// copied from wglext.h
 typedef BOOL(WINAPI * PFNWGLCHOOSEPIXELFORMATARBPROC) (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats);
 typedef HGLRC(WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
 typedef BOOL(WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
@@ -467,6 +468,11 @@ typedef BOOL(WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
 
 static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT;
 
+// winx cursor image struct
+struct WinxCursor_s {
+	HCURSOR native;
+};
+
 // winx global state struct
 typedef struct {
 	HWND hndl;
@@ -474,6 +480,7 @@ typedef struct {
 	HGLRC context;
 
 	bool mouse_capture;
+	WinxCursor* cursor;
 	WinxMouseEventHandle mouse;
 	WinxButtonEventHandle button;
 	WinxKeybordEventHandle keyboard;
@@ -496,6 +503,30 @@ static PROC winxGetProc(LPCSTR name) {
 	}
 
 	return NULL;
+}
+
+static void winxUpdateMouseState(bool captured, WinxCursor* cursor) {
+	if (captured) {
+		RECT rect;
+
+		// taken from GLFW
+		GetClientRect(winx->hndl, &rect);
+		ClientToScreen(winx->hndl, (POINT*) &rect.left);
+		ClientToScreen(winx->hndl, (POINT*) &rect.right);
+
+		bool success = ClipCursor(&rect);
+		if (!success) {
+			winxErrorMsg = (char*) "ClipCursor: Failed to clip cursor!";
+		}
+	} else {
+		ClipCursor(NULL);
+	}
+
+	if (cursor) {
+		SetCursor(cursor->native);
+	} else {
+		SetCursor(LoadCursor(NULL, IDC_ARROW));
+	}
 }
 
 static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -550,6 +581,23 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 			winx->resize(LOWORD(lParam), HIWORD(lParam));
 			break;
 
+		case WM_SETFOCUS:
+			winxUpdateMouseState(winx->mouse_capture, winx->cursor);
+			break;
+
+		case WM_KILLFOCUS:
+			winxUpdateMouseState(false, NULL);
+			break;
+
+		// needed because yes
+		// https://docs.microsoft.com/en-us/windows/win32/learnwin32/setting-the-cursor-image
+		case WM_SETCURSOR:
+			if (LOWORD(lParam) == HTCLIENT) {
+				winxUpdateMouseState(winx->mouse_capture, winx->cursor);
+				return TRUE;
+			}
+			break;
+
 		default:
 			result = DefWindowProcA(hWnd, message, wParam, lParam);
 	}
@@ -558,7 +606,7 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 }
 
 bool winxOpen(int width, int height, const char* title) {
-	winx = (WinxHandle*) malloc(sizeof(WinxHandle));
+	winx = (WinxHandle*) calloc(1, sizeof(WinxHandle));
 	winx->mouse_capture = false;
 
 	HINSTANCE hinstance = GetModuleHandle(NULL);
@@ -772,6 +820,65 @@ void winxSetTitle(const char* title) {
 	SetWindowTextA(winx->hndl, title);
 }
 
+static HICON winxCreateIcon(int width, int height, unsigned char* buffer, bool is_icon, int x_hot, int y_hot) {
+	char* target = NULL;
+	BITMAPV5HEADER header = {0};
+
+	header.bV5Size        = sizeof(header);
+	header.bV5Width       = width;
+	header.bV5Height      = -height;
+	header.bV5Planes      = 1;
+	header.bV5BitCount    = 32;
+	header.bV5Compression = BI_BITFIELDS;
+
+	// the order needs to be presisly like that
+	// otherwise alpha doesn't work
+	header.bV5RedMask     = 0x00ff0000;
+	header.bV5GreenMask   = 0x0000ff00;
+	header.bV5BlueMask    = 0x000000ff;
+	header.bV5AlphaMask   = 0xff000000;
+
+	HDC dc = GetDC(NULL);
+
+	if (!dc) {
+		winxErrorMsg = (char*) "GetDC: Failed to acquire drawable!";
+		return NULL;
+	}
+
+	HBITMAP mask = CreateBitmap(width, height, 1, 1, NULL);
+	HBITMAP color = CreateDIBSection(dc, (BITMAPINFO*) &header, DIB_RGB_COLORS, (void**) &target, NULL, 0);
+	ReleaseDC(NULL, dc);
+
+	for (int i = 0; i < width * height;  i++) {
+		target[0] = buffer[0];
+		target[1] = buffer[1];
+		target[2] = buffer[2];
+		target[3] = buffer[3];
+
+		target += 4;
+		buffer += 4;
+	}
+
+	ICONINFO info = {0};
+	info.fIcon = is_icon;
+	info.xHotspot = x_hot;
+	info.yHotspot = y_hot;
+	info.hbmMask = mask;
+	info.hbmColor = color;
+
+	HICON icon = CreateIconIndirect(&info);
+
+	DeleteObject(color);
+	DeleteObject(mask);
+
+	if (!icon) {
+		winxErrorMsg = (char*) "CreateIconIndirect: Failed to create icon handle!";
+		return NULL;
+	}
+
+	return icon;
+}
+
 void winxSetIcon(int width, int height, unsigned char* buffer) {
 	WINX_CONTEXT_ASSERT("winxSetIcon");
 
@@ -784,58 +891,11 @@ void winxSetIcon(int width, int height, unsigned char* buffer) {
 
 	} else {
 
-		char* target = NULL;
-		BITMAPV5HEADER header = {0};
+		HICON icon = winxCreateIcon(width, height, buffer, true, 0, 0);
 
-		header.bV5Size        = sizeof(header);
-		header.bV5Width       = width;
-		header.bV5Height      = -height;
-		header.bV5Planes      = 1;
-		header.bV5BitCount    = 32;
-		header.bV5Compression = BI_BITFIELDS;
-
-		// the order needs to be presisly like that
-		// otherwise alpha doesn't work
-		header.bV5RedMask     = 0x00ff0000;
-		header.bV5GreenMask   = 0x0000ff00;
-		header.bV5BlueMask    = 0x000000ff;
-		header.bV5AlphaMask   = 0xff000000;
-
-		HDC dc = GetDC(NULL);
-
-		if (!dc) {
-			winxErrorMsg = (char*) "GetDC: Failed to acquire drawable!";
-			return;
-		}
-
-		HBITMAP mask = CreateBitmap(width, height, 1, 1, NULL);
-		HBITMAP color = CreateDIBSection(dc, (BITMAPINFO*) &header, DIB_RGB_COLORS, (void**) &target, NULL, 0);
-		ReleaseDC(NULL, dc);
-
-		for (int i = 0; i < width * height;  i++) {
-			target[0] = buffer[0];
-			target[1] = buffer[1];
-			target[2] = buffer[2];
-			target[3] = buffer[3];
-
-			target += 4;
-			buffer += 4;
-		}
-
-		ICONINFO info = {0};
-		info.fIcon = TRUE;
-		info.xHotspot = 0;
-		info.yHotspot = 0;
-		info.hbmMask = mask;
-		info.hbmColor = color;
-
-		HICON icon = CreateIconIndirect(&info);
-
-		DeleteObject(color);
-		DeleteObject(mask);
-
-		if (!icon) {
-			winxErrorMsg = (char*) "CreateIconIndirect: Failed to create icon handle!";
+		if (icon == NULL) {
+			// don't set the error message as it must
+			// have been already set by winxCreateIcon
 			return;
 		}
 
@@ -848,12 +908,53 @@ void winxSetIcon(int width, int height, unsigned char* buffer) {
 	SendMessage(winx->hndl, WM_SETICON, ICON_SMALL, (LPARAM) smallIcon);
 }
 
+WinxCursor* winxCreateCursorIcon(int width, int height, unsigned char* buffer, int x, int y) {
+	if (buffer == NULL) {
+		return NULL;
+	}
+
+	if (!winx) {
+		winxErrorMsg = (char*) "winxCreateCursorIcon: No active winx context!";
+		return NULL;
+	}
+
+	WinxCursor* cursor = (WinxCursor*) malloc(sizeof(WinxCursor));
+	cursor->native = winxCreateIcon(width, height, buffer, false, x, y);
+
+	return cursor;
+}
+
+WinxCursor* winxCreateNullCursorIcon() {
+	WinxCursor* cursor = (WinxCursor*) malloc(sizeof(WinxCursor));
+	cursor->native = NULL;
+	return cursor;
+}
+
+void winxDeleteCursorIcon(WinxCursor* cursor) {
+	if (cursor) {
+		if (cursor->native) {
+			DestroyIcon((HICON) cursor->native);
+		}
+
+		free(cursor);
+	}
+}
+
 void winxSetVsync(int vsync) {
 	WINX_CONTEXT_ASSERT("winxSetVsync");
 
 	if (wglSwapIntervalEXT) {
 		wglSwapIntervalEXT(__winx_hint_vsync);
 	}
+}
+
+bool winxGetFocus() {
+	if (!winx) {
+		winxErrorMsg = (char*) "winxGetFocus: No active winx context!";
+		return false;
+	}
+
+	return GetActiveWindow() == winx->hndl;
 }
 
 #endif // WINAPI

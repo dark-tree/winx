@@ -14,4 +14,4 @@ To see WINX in action run the `build.sh` (or `./build.bat` on Windows) script to
 Documentation describing the basics of using WINX can be found at the beginning of the `winx.h` header file, just under the license.
 
 #### License
-Boost Software License - Version 1.0 - August 17th, 2003
+This project is licensed under the MIT license.

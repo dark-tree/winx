@@ -46,11 +46,6 @@ int main() {
 		exit(1);
 	}
 
-//	winxSetMouseCapture(true);
-
-    WinxCursor* cursor = winxCreateNullCursorIcon();
-	winxSetCursorIcon(cursor);
-
 	// use GLAD to load OpenGL functions
 	gladLoadGL();
 
@@ -67,8 +62,6 @@ int main() {
 		winxPollEvents();
 		watch();
 	}
-
-	winxDeleteCursorIcon(cursor);
 
 }
 

@@ -437,6 +437,13 @@ void winxSetFocus() {
 	XFlush(winx->display);
 }
 
+void winxSetCursorPos(int x, int y) {
+	WINX_CONTEXT_ASSERT("winxSetCursorPos");
+
+	XWarpPointer(winx->display, None, winx->window, 0, 0, 0, 0, x, y);
+	XFlush(winx->display);
+}
+
 #endif // GLX
 
 #if defined(WINX_WINAPI)
@@ -981,6 +988,15 @@ void winxSetFocus() {
 	SetActiveWindow(winx->hndl);
 	SetForegroundWindow(winx->hndl);
 	SetFocus(winx->hndl);
+}
+
+void winxSetCursorPos(int x, int y) {
+	WINX_CONTEXT_ASSERT("winxSetCursorPos");
+
+	POINT pos = {x, y};
+
+	ClientToScreen(winx->hndl, &pos);
+	SetCursorPos(pos.x, pos.y);
 }
 
 #endif // WINAPI

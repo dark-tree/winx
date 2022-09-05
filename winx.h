@@ -133,6 +133,9 @@ void winxDeleteCursorIcon(WinxCursor* cursor);
 /// set the cursor icon for the current window, accepts WINX_ICON_DEFAULT
 void winxSetCursorIcon(WinxCursor* cursor);
 
+/// set the position of the cursor within the current window
+void winxSetCursorPos(int x, int y);
+
 /// set the handle for mouse movement events for current window, pass NULL to unset
 void winxSetMouseEventHandle(WinxMouseEventHandle handle);
 

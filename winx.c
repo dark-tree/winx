@@ -11,6 +11,7 @@ void WinxDummyKeybordEventHandle(int type, int key) {}
 void WinxDummyScrollEventHandle(int scroll) {}
 void WinxDummyCloseEventHandle() {}
 void WinxDummyResizeEventHandle(int width, int height) {}
+void WinxDummyFocusEventHandle(bool focus) {}
 
 // hints
 static int __winx_hint_vsync = 0;
@@ -96,6 +97,7 @@ typedef struct {
 	WinxScrollEventHandle scroll;
 	WinxCloseEventHandle close;
 	WinxResizeEventHandle resize;
+	WinxFocusEventHandle focus;
 } WinxHandle;
 
 static WinxHandle* winx = NULL;
@@ -302,10 +304,12 @@ void winxPollEvents() {
 				break;
 
 			case FocusIn:
+				winx->focus(true);
 				winxUpdateMouseState(winx->mouse_capture, winx->cursor);
 				break;
 
 			case FocusOut:
+				winx->focus(false);
 				winxUpdateMouseState(false, NULL);
 				break;
 
@@ -422,6 +426,17 @@ bool winxGetFocus() {
 	return focused == winx->window;
 }
 
+void winxSetFocus() {
+	WINX_CONTEXT_ASSERT("winxSetFocus");
+
+	XSetInputFocus(winx->display, winx->window, RevertToNone, CurrentTime);
+
+	// this doesn't seem to actually bring the window up
+	// investigate if there is a more reliable solution
+	XRaiseWindow(winx->display, winx->window);
+	XFlush(winx->display);
+}
+
 #endif // GLX
 
 #if defined(WINX_WINAPI)
@@ -487,6 +502,7 @@ typedef struct {
 	WinxScrollEventHandle scroll;
 	WinxCloseEventHandle close;
 	WinxResizeEventHandle resize;
+	WinxFocusEventHandle focus;
 } WinxHandle;
 
 static WinxHandle* winx = NULL;
@@ -582,10 +598,12 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 			break;
 
 		case WM_SETFOCUS:
+			winx->focus(true);
 			winxUpdateMouseState(winx->mouse_capture, winx->cursor);
 			break;
 
 		case WM_KILLFOCUS:
+			winx->focus(false);
 			winxUpdateMouseState(false, NULL);
 			break;
 
@@ -957,6 +975,14 @@ bool winxGetFocus() {
 	return GetActiveWindow() == winx->hndl;
 }
 
+void winxSetFocus() {
+	WINX_CONTEXT_ASSERT("winxSetFocus");
+
+	SetActiveWindow(winx->hndl);
+	SetForegroundWindow(winx->hndl);
+	SetFocus(winx->hndl);
+}
+
 #endif // WINAPI
 
 void winxSetMouseEventHandle(WinxMouseEventHandle handle) {
@@ -989,6 +1015,11 @@ void winxSetResizeEventHandle(WinxResizeEventHandle handle) {
 	winx->resize = handle;
 }
 
+void winxSetFocusEventHandle(WinxFocusEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetFocusEventHandle");
+	winx->focus = handle;
+}
+
 void winxResetEventHandles() {
 	WINX_CONTEXT_ASSERT("winxResetEventHandles");
 	winx->button = WinxDummyButtonEventHandle;
@@ -997,6 +1028,7 @@ void winxResetEventHandles() {
 	winx->scroll = WinxDummyScrollEventHandle;
 	winx->close = WinxDummyCloseEventHandle;
 	winx->resize = WinxDummyResizeEventHandle;
+	winx->focus = WinxDummyFocusEventHandle;
 }
 
 void winxSetMouseCapture(bool captured) {

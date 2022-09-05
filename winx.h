@@ -83,6 +83,7 @@ typedef void (*WinxKeybordEventHandle)(int state, int keycode);
 typedef void (*WinxScrollEventHandle)(int scroll);
 typedef void (*WinxCloseEventHandle)(void);
 typedef void (*WinxResizeEventHandle)(int width, int height);
+typedef void (*WinxFocusEventHandle)(bool focused);
 
 /// set a window hint, has to be called prior to winxOpen()
 void winxHint(int hint, int value);
@@ -113,6 +114,9 @@ void winxSetVsync(int vsync);
 
 /// check if the current window is focused
 bool winxGetFocus();
+
+/// focus the current window
+void winxSetFocus();
 
 /// constreain the mouse pointer to the current window
 void winxSetMouseCapture(bool capture);
@@ -146,6 +150,9 @@ void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 
 /// set the handle for window resize event for current window
 void winxSetResizeEventHandle(WinxResizeEventHandle handle);
+
+/// set the handle for window focus events for current window
+void winxSetFocusEventHandle(WinxFocusEventHandle handle);
 
 /// reset all even handles for current window
 void winxResetEventHandles();

@@ -5,7 +5,7 @@
 #define WINX_CONTEXT_ASSERT(function) if(!winx) { winxErrorMsg = (char*) (function ": No active winx context!"); return; }
 
 // dummy functions
-void WinxDummyMouseEventHandle(int x, int y) {}
+void WinxDummyCursorEventHandle(int x, int y) {}
 void WinxDummyButtonEventHandle(int type, int button) {}
 void WinxDummyKeybordEventHandle(int type, int key) {}
 void WinxDummyScrollEventHandle(int scroll) {}
@@ -89,9 +89,9 @@ typedef struct {
 	Atom net_wm_icon;
 	Atom cardinal;
 
-	bool mouse_capture;
-	WinxCursor* cursor;
-	WinxMouseEventHandle mouse;
+	bool capture;
+	WinxCursor* cursor_icon;
+	WinxCursorEventHandle cursor;
 	WinxButtonEventHandle button;
 	WinxKeybordEventHandle keyboard;
 	WinxScrollEventHandle scroll;
@@ -116,7 +116,7 @@ static __GLXextFuncPtr winxGetProc(const char* name) {
 	return NULL;
 }
 
-static void winxUpdateMouseState(bool captured, WinxCursor* cursor) {
+static void winxUpdateCursorState(bool captured, WinxCursor* cursor) {
 	if (captured) {
 		unsigned int events = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 		XGrabPointer(winx->display, winx->window, true, events, GrabModeAsync, GrabModeAsync, winx->window, None, CurrentTime);
@@ -132,8 +132,8 @@ static void winxUpdateMouseState(bool captured, WinxCursor* cursor) {
 }
 
 bool winxOpen(int width, int height, const char* title) {
-	winx = (WinxHandle*) malloc(sizeof(WinxHandle));
-	winx->mouse_capture = false;
+	winx = (WinxHandle*) calloc(1, sizeof(WinxHandle));
+	winx->capture = false;
 
 	// set dummy function pointers
 	winxResetEventHandles();
@@ -296,7 +296,7 @@ void winxPollEvents() {
 				break;
 
 			case MotionNotify:
-				winx->mouse(event.xmotion.x_root, event.xmotion.y_root);
+				winx->cursor(event.xmotion.x_root, event.xmotion.y_root);
 				break;
 
 			case ConfigureNotify:
@@ -305,12 +305,12 @@ void winxPollEvents() {
 
 			case FocusIn:
 				winx->focus(true);
-				winxUpdateMouseState(winx->mouse_capture, winx->cursor);
+				winxUpdateCursorState(winx->capture, winx->cursor_icon);
 				break;
 
 			case FocusOut:
 				winx->focus(false);
-				winxUpdateMouseState(false, NULL);
+				winxUpdateCursorState(false, NULL);
 				break;
 
 			default:
@@ -501,9 +501,9 @@ typedef struct {
 	HDC device;
 	HGLRC context;
 
-	bool mouse_capture;
-	WinxCursor* cursor;
-	WinxMouseEventHandle mouse;
+	bool capture;
+	WinxCursor* cursor_icon;
+	WinxCursorEventHandle cursor;
 	WinxButtonEventHandle button;
 	WinxKeybordEventHandle keyboard;
 	WinxScrollEventHandle scroll;
@@ -528,7 +528,7 @@ static PROC winxGetProc(LPCSTR name) {
 	return NULL;
 }
 
-static void winxUpdateMouseState(bool captured, WinxCursor* cursor) {
+static void winxUpdateCursorState(bool captured, WinxCursor* cursor) {
 	if (captured) {
 		RECT rect;
 
@@ -565,7 +565,7 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 			break;
 
 		case WM_MOUSEMOVE:
-			winx->mouse(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			winx->cursor(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 			break;
 
 		case WM_LBUTTONDOWN:
@@ -606,19 +606,19 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 
 		case WM_SETFOCUS:
 			winx->focus(true);
-			winxUpdateMouseState(winx->mouse_capture, winx->cursor);
+			winxUpdateCursorState(winx->capture, winx->cursor_icon);
 			break;
 
 		case WM_KILLFOCUS:
 			winx->focus(false);
-			winxUpdateMouseState(false, NULL);
+			winxUpdateCursorState(false, NULL);
 			break;
 
 		// needed because yes
 		// https://docs.microsoft.com/en-us/windows/win32/learnwin32/setting-the-cursor-image
 		case WM_SETCURSOR:
 			if (LOWORD(lParam) == HTCLIENT) {
-				winxUpdateMouseState(winx->mouse_capture, winx->cursor);
+				winxUpdateCursorState(winx->capture, winx->cursor_icon);
 				return TRUE;
 			}
 			break;
@@ -632,7 +632,7 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 
 bool winxOpen(int width, int height, const char* title) {
 	winx = (WinxHandle*) calloc(1, sizeof(WinxHandle));
-	winx->mouse_capture = false;
+	winx->capture = false;
 
 	HINSTANCE hinstance = GetModuleHandle(NULL);
 
@@ -1001,9 +1001,9 @@ void winxSetCursorPos(int x, int y) {
 
 #endif // WINAPI
 
-void winxSetMouseEventHandle(WinxMouseEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetMouseEventHandle");
-	winx->mouse = handle ? handle : WinxDummyMouseEventHandle;
+void winxSetCursorEventHandle(WinxCursorEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetCursorEventHandle");
+	winx->cursor = handle ? handle : WinxDummyCursorEventHandle;
 }
 
 void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
@@ -1038,7 +1038,7 @@ void winxSetFocusEventHandle(WinxFocusEventHandle handle) {
 
 void winxResetEventHandles() {
 	WINX_CONTEXT_ASSERT("winxResetEventHandles");
-	winx->mouse = WinxDummyMouseEventHandle;
+	winx->cursor = WinxDummyCursorEventHandle;
 	winx->button = WinxDummyButtonEventHandle;
 	winx->keyboard = WinxDummyKeybordEventHandle;
 	winx->scroll = WinxDummyScrollEventHandle;
@@ -1047,23 +1047,23 @@ void winxResetEventHandles() {
 	winx->focus = WinxDummyFocusEventHandle;
 }
 
-void winxSetMouseCapture(bool captured) {
-	WINX_CONTEXT_ASSERT("winxSetMouseCapture");
-	winx->mouse_capture = captured;
+void winxSetCursorCapture(bool captured) {
+	WINX_CONTEXT_ASSERT("winxSetCursorCapture");
+	winx->capture = captured;
 
 	// if the window is not focused the even loop will set/unset it later
 	if (winxGetFocus()) {
-		winxUpdateMouseState(captured, winx->cursor);
+		winxUpdateCursorState(winx->capture, winx->cursor_icon);
 	}
 }
 
 void winxSetCursorIcon(WinxCursor* cursor) {
 	WINX_CONTEXT_ASSERT("winxSetCursorIcon");
-	winx->cursor = cursor;
+	winx->cursor_icon = cursor;
 
 	// if the window is not focused the even loop will set/unset it later
 	if (winxGetFocus()) {
-		winxUpdateMouseState(winx->mouse_capture, cursor);
+		winxUpdateCursorState(winx->capture, winx->cursor_icon);
 	}
 }
 

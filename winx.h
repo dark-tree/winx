@@ -77,7 +77,7 @@ extern "C" {
 
 typedef struct WinxCursor_s WinxCursor;
 
-typedef void (*WinxMouseEventHandle)(int x, int y);
+typedef void (*WinxCursorEventHandle)(int x, int y);
 typedef void (*WinxButtonEventHandle)(int state, int button);
 typedef void (*WinxKeybordEventHandle)(int state, int keycode);
 typedef void (*WinxScrollEventHandle)(int scroll);
@@ -118,13 +118,13 @@ bool winxGetFocus();
 /// focus the current window
 void winxSetFocus();
 
-/// constreain the mouse pointer to the current window
-void winxSetMouseCapture(bool capture);
+/// constreain the cursor pointer to the current window
+void winxSetCursorCapture(bool capture);
 
-/// get the cursor icon for the mouse pointer from a RGBA image
+/// get the cursor icon for the cursor pointer from a RGBA image
 WinxCursor* winxCreateCursorIcon(int width, int height, unsigned char* buffer, int x, int y);
 
-/// get an empty cursor icon for the mouse pointer
+/// get an empty cursor icon for the cursor pointer
 WinxCursor* winxCreateNullCursorIcon();
 
 /// free the allocated icon
@@ -136,16 +136,16 @@ void winxSetCursorIcon(WinxCursor* cursor);
 /// set the position of the cursor within the current window
 void winxSetCursorPos(int x, int y);
 
-/// set the handle for mouse movement events for current window, pass NULL to unset
-void winxSetMouseEventHandle(WinxMouseEventHandle handle);
+/// set the handle for cursor movement events for current window, pass NULL to unset
+void winxSetCursorEventHandle(WinxCursorEventHandle handle);
 
-/// set the handle for mouse click events for current window, pass NULL to unset
+/// set the handle for cursor click events for current window, pass NULL to unset
 void winxSetButtonEventHandle(WinxButtonEventHandle handle);
 
 /// set the handle for keybord events for current window, pass NULL to unset
 void winxSetKeybordEventHandle(WinxKeybordEventHandle handle);
 
-/// set the handle for mouse scroll for current window, pass NULL to unset
+/// set the handle for cursor scroll for current window, pass NULL to unset
 void winxSetScrollEventHandle(WinxScrollEventHandle handle);
 
 /// set the handle for window close button for current window, pass NULL to unset

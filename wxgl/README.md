@@ -5,5 +5,5 @@ WXGL is a single-header library made from combining WINX and GLAD, to use WXGL f
 
 - Run `python3 generate.py --glad "/path/to/your/glad.zip"` from the `./wxgl` directory.
 
-The `wxgl.c` and `wxgl.h` files should have been generated in the `wxgl` directory, now you can take them and use anywhere! **Note**: The `wxgl.c` has to be compiled with the `-ldl -lGL -lX11` options on Linux and `-lopengl32 -lgdi32` on Windows.
+The `wxgl.c` and `wxgl.h` files should have been generated in the `wxgl` directory, now you can take them and use anywhere! **Note**: The `wxgl.c` has to be compiled with the `-ldl -lGL -lX11 -lXcursor` options on Linux and `-lopengl32 -lgdi32` on Windows.
 

@@ -987,43 +987,43 @@ void winxSetFocus() {
 
 void winxSetMouseEventHandle(WinxMouseEventHandle handle) {
 	WINX_CONTEXT_ASSERT("winxSetMouseEventHandle");
-	winx->mouse = handle;
+	winx->mouse = handle ? handle : WinxDummyMouseEventHandle;
 }
 
 void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
 	WINX_CONTEXT_ASSERT("winxSetButtonEventHandle");
-	winx->button = handle;
+	winx->button = handle ? handle : WinxDummyButtonEventHandle;
 }
 
 void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
 	WINX_CONTEXT_ASSERT("winxSetKeybordEventHandle");
-	winx->keyboard = handle;
+	winx->keyboard = handle ? handle : WinxDummyKeybordEventHandle;
 }
 
 void winxSetScrollEventHandle(WinxScrollEventHandle handle) {
 	WINX_CONTEXT_ASSERT("winxSetScrollEventHandle");
-	winx->scroll = handle;
+	winx->scroll = handle ? handle : WinxDummyScrollEventHandle;
 }
 
 void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
 	WINX_CONTEXT_ASSERT("winxSetCloseEventHandle");
-	winx->close = handle;
+	winx->close = handle ? handle : WinxDummyCloseEventHandle;
 }
 
 void winxSetResizeEventHandle(WinxResizeEventHandle handle) {
 	WINX_CONTEXT_ASSERT("winxSetResizeEventHandle");
-	winx->resize = handle;
+	winx->resize = handle ? handle : WinxDummyResizeEventHandle;
 }
 
 void winxSetFocusEventHandle(WinxFocusEventHandle handle) {
 	WINX_CONTEXT_ASSERT("winxSetFocusEventHandle");
-	winx->focus = handle;
+	winx->focus = handle ? handle : WinxDummyFocusEventHandle;
 }
 
 void winxResetEventHandles() {
 	WINX_CONTEXT_ASSERT("winxResetEventHandles");
-	winx->button = WinxDummyButtonEventHandle;
 	winx->mouse = WinxDummyMouseEventHandle;
+	winx->button = WinxDummyButtonEventHandle;
 	winx->keyboard = WinxDummyKeybordEventHandle;
 	winx->scroll = WinxDummyScrollEventHandle;
 	winx->close = WinxDummyCloseEventHandle;

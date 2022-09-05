@@ -133,25 +133,25 @@ void winxDeleteCursorIcon(WinxCursor* cursor);
 /// set the cursor icon for the current window, accepts WINX_ICON_DEFAULT
 void winxSetCursorIcon(WinxCursor* cursor);
 
-/// set the handle for mouse movement events for current window
+/// set the handle for mouse movement events for current window, pass NULL to unset
 void winxSetMouseEventHandle(WinxMouseEventHandle handle);
 
-/// set the handle for mouse click events for current window
+/// set the handle for mouse click events for current window, pass NULL to unset
 void winxSetButtonEventHandle(WinxButtonEventHandle handle);
 
-/// set the handle for keybord events for current window
+/// set the handle for keybord events for current window, pass NULL to unset
 void winxSetKeybordEventHandle(WinxKeybordEventHandle handle);
 
-/// set the handle for mouse scroll for current window
+/// set the handle for mouse scroll for current window, pass NULL to unset
 void winxSetScrollEventHandle(WinxScrollEventHandle handle);
 
-/// set the handle for window close button for current window
+/// set the handle for window close button for current window, pass NULL to unset
 void winxSetCloseEventHandle(WinxCloseEventHandle handle);
 
-/// set the handle for window resize event for current window
+/// set the handle for window resize event for current window, pass NULL to unset
 void winxSetResizeEventHandle(WinxResizeEventHandle handle);
 
-/// set the handle for window focus events for current window
+/// set the handle for window focus events for current window, pass NULL to unset
 void winxSetFocusEventHandle(WinxFocusEventHandle handle);
 
 /// reset all even handles for current window

@@ -65,11 +65,12 @@ void winxHint(int hint, int value) {
 #include <X11/keysym.h>
 #include <X11/Xcursor/Xcursor.h>
 #include <GL/glx.h>
+#include <time.h>
 
 // copied from glxext.h
-typedef int ( *PFNGLXSWAPINTERVALMESAPROC) (unsigned int interval);
-typedef void ( *PFNGLXSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawable, int interval);
-typedef GLXContext ( *PFNGLXCREATECONTEXTATTRIBSARBPROC) (Display *dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
+typedef int (*PFNGLXSWAPINTERVALMESAPROC) (unsigned int interval);
+typedef void (*PFNGLXSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawable, int interval);
+typedef GLXContext (*PFNGLXCREATECONTEXTATTRIBSARBPROC) (Display *dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
 
 static PFNGLXSWAPINTERVALMESAPROC glXSwapIntervalMESA;
 static PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT;
@@ -90,6 +91,7 @@ typedef struct {
 	Atom cardinal;
 
 	bool capture;
+	time_t time;
 	WinxCursor* cursor_icon;
 	WinxCursorEventHandle cursor;
 	WinxButtonEventHandle button;
@@ -134,6 +136,10 @@ static void winxUpdateCursorState(bool captured, WinxCursor* cursor) {
 bool winxOpen(int width, int height, const char* title) {
 	winx = (WinxHandle*) calloc(1, sizeof(WinxHandle));
 	winx->capture = false;
+
+	struct timespec spec;
+	clock_gettime(CLOCK_REALTIME, &spec);
+	winx->time = spec.tv_sec;
 
 	// set dummy function pointers
 	winxResetEventHandles();
@@ -444,6 +450,17 @@ void winxSetCursorPos(int x, int y) {
 	XFlush(winx->display);
 }
 
+double winxGetTime() {
+	if (!winx) {
+		winxErrorMsg = (char*) "winxGetTime: No active winx context!";
+		return 0;
+	}
+
+	struct timespec spec;
+	clock_gettime(CLOCK_REALTIME, &spec);
+	return (spec.tv_sec - winx->time) + (spec.tv_nsec / (double) 1e+9);
+}
+
 #endif // GLX
 
 #if defined(WINX_WINAPI)
@@ -501,6 +518,7 @@ typedef struct {
 	HDC device;
 	HGLRC context;
 
+	unsigned long long time;
 	bool capture;
 	WinxCursor* cursor_icon;
 	WinxCursorEventHandle cursor;
@@ -633,6 +651,8 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 bool winxOpen(int width, int height, const char* title) {
 	winx = (WinxHandle*) calloc(1, sizeof(WinxHandle));
 	winx->capture = false;
+
+	QueryPerformanceCounter((LARGE_INTEGER*) &winx->time);
 
 	HINSTANCE hinstance = GetModuleHandle(NULL);
 
@@ -997,6 +1017,14 @@ void winxSetCursorPos(int x, int y) {
 
 	ClientToScreen(winx->hndl, &pos);
 	SetCursorPos(pos.x, pos.y);
+}
+
+double winxGetTime() {
+	unsigned long long frequency, count;
+	QueryPerformanceFrequency((LARGE_INTEGER*) &frequency);
+	QueryPerformanceCounter((LARGE_INTEGER*) &count);
+
+	return (count - winx->time) / (double) frequency;
 }
 
 #endif // WINAPI

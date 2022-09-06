@@ -181,6 +181,10 @@ void winxSetFocusEventHandle(WinxFocusEventHandle handle);
 /// you can also pass NULL to a specific event handler setter to reset it
 void winxResetEventHandles();
 
+/// return a time in seconds since the winxOpen() was called (if successful)
+/// this function emulates the behaviour of glfwGetTime()
+double winxGetTime();
+
 #define WINX_ICON_DEFAULT NULL
 #define WINX_PRESSED 1
 #define WINX_RELEASED 0

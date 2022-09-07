@@ -270,10 +270,11 @@ void winxPollEvents() {
 		switch (event.type) {
 
 			case ClientMessage:
-				if (event.xclient.data.l[0] == winx->wm_delete_window) {
+				if ((Atom) event.xclient.data.l[0] == winx->wm_delete_window) {
 					winx->close();
 					break;
 				}
+				break;
 
 			case KeyPress:
 				winx->keyboard(WINX_PRESSED, XLookupKeysym(&event.xkey, 0));
@@ -302,7 +303,7 @@ void winxPollEvents() {
 				break;
 
 			case MotionNotify:
-				winx->cursor(event.xmotion.x_root, event.xmotion.y_root);
+				winx->cursor(event.xmotion.x, event.xmotion.y);
 				break;
 
 			case ConfigureNotify:
@@ -1020,6 +1021,11 @@ void winxSetCursorPos(int x, int y) {
 }
 
 double winxGetTime() {
+	if (!winx) {
+		winxErrorMsg = (char*) "winxGetTime: No active winx context!";
+		return 0;
+	}
+
 	unsigned long long frequency, count;
 	QueryPerformanceFrequency((LARGE_INTEGER*) &frequency);
 	QueryPerformanceCounter((LARGE_INTEGER*) &count);

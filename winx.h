@@ -39,7 +39,7 @@
  *		exit(1);
  *	}
  *
- *	Some properties of the window that is created with 'winxOpen' can be modified with "hints" that have to be set prior to its
+ *	Some properties of the window created with 'winxOpen' can be modified with "hints" that have to be set prior to its
  *	creation with the 'winxHint' function. Note that WINX is allowed to ignore impossible to satisfy hints! See the list of available
  *	hints below the function list, under "hint keys".
  *
@@ -61,7 +61,7 @@
 #ifndef WINX_H
 #define WINX_H
 
-#define WINX_VERSION "1.0.0"
+#define WINX_VERSION "1.1.0"
 
 #include <stdbool.h>
 #include <stdlib.h>

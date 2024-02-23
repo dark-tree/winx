@@ -75,7 +75,7 @@ typedef struct WinxCursor_s WinxCursor;
 
 typedef void (*WinxCursorEventHandle)(int x, int y);
 typedef void (*WinxButtonEventHandle)(int state, int button);
-typedef void (*WinxKeybordEventHandle)(int state, int keycode);
+typedef void (*WinxKeyboardEventHandle)(int state, int keycode);
 typedef void (*WinxScrollEventHandle)(int scroll);
 typedef void (*WinxCloseEventHandle)(void);
 typedef void (*WinxResizeEventHandle)(int width, int height);
@@ -157,9 +157,9 @@ void winxSetCursorEventHandle(WinxCursorEventHandle handle);
 /// pass NULL to unset the associated event handler (if any)
 void winxSetButtonEventHandle(WinxButtonEventHandle handle);
 
-/// set the handle for keybord events for current window
+/// set the handle for keyboard events for current window
 /// pass NULL to unset the associated event handler (if any)
-void winxSetKeybordEventHandle(WinxKeybordEventHandle handle);
+void winxSetKeyboardEventHandle(WinxKeyboardEventHandle handle);
 
 /// set the handle for cursor scroll for current window
 /// pass NULL to unset the associated event handler (if any)
@@ -250,4 +250,3 @@ double winxGetTime();
 #endif
 
 #endif // WINX_H
-

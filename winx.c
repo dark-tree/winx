@@ -7,7 +7,7 @@
 // dummy functions
 void WinxDummyCursorEventHandle(int x, int y) {}
 void WinxDummyButtonEventHandle(int type, int button) {}
-void WinxDummyKeybordEventHandle(int type, int key) {}
+void WinxDummyKeyboardEventHandle(int type, int key) {}
 void WinxDummyScrollEventHandle(int scroll) {}
 void WinxDummyCloseEventHandle() {}
 void WinxDummyResizeEventHandle(int width, int height) {}
@@ -95,7 +95,7 @@ typedef struct {
 	WinxCursor* cursor_icon;
 	WinxCursorEventHandle cursor;
 	WinxButtonEventHandle button;
-	WinxKeybordEventHandle keyboard;
+	WinxKeyboardEventHandle keyboard;
 	WinxScrollEventHandle scroll;
 	WinxCloseEventHandle close;
 	WinxResizeEventHandle resize;
@@ -1045,9 +1045,9 @@ void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
 	winx->button = handle ? handle : WinxDummyButtonEventHandle;
 }
 
-void winxSetKeybordEventHandle(WinxKeybordEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetKeybordEventHandle");
-	winx->keyboard = handle ? handle : WinxDummyKeybordEventHandle;
+void winxSetKeyboardEventHandle(WinxKeyboardEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetKeyboardEventHandle");
+	winx->keyboard = handle ? handle : WinxDummyKeyboardEventHandle;
 }
 
 void winxSetScrollEventHandle(WinxScrollEventHandle handle) {
@@ -1074,7 +1074,7 @@ void winxResetEventHandles() {
 	WINX_CONTEXT_ASSERT("winxResetEventHandles");
 	winx->cursor = WinxDummyCursorEventHandle;
 	winx->button = WinxDummyButtonEventHandle;
-	winx->keyboard = WinxDummyKeybordEventHandle;
+	winx->keyboard = WinxDummyKeyboardEventHandle;
 	winx->scroll = WinxDummyScrollEventHandle;
 	winx->close = WinxDummyCloseEventHandle;
 	winx->resize = WinxDummyResizeEventHandle;
@@ -1100,4 +1100,3 @@ void winxSetCursorIcon(WinxCursor* cursor) {
 		winxUpdateCursorState(winx->capture, winx->cursor_icon);
 	}
 }
-

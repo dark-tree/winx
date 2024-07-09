@@ -1,4 +1,2 @@
-main
-main.exe
-wxgl/wxgl.h
-wxgl/wxgl.c
+build/
+cmake-build-debug/

@@ -1,5 +1,5 @@
 
-#include "glad/glad.h"
+#include "external/glad.h"
 #include <winx.h>
 #include <stdio.h>
 #include "render.h"
@@ -37,4 +37,3 @@ int main() {
 	}
 
 }
-

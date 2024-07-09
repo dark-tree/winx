@@ -7,15 +7,20 @@ on:
     branches: [master]
 
 jobs:
-  build:
-    name: Build Project
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: openrndr/setup-opengl@v1.1
 
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+      - name: Configure
+        run: cmake -B ${{ github.workspace }}/build -S ${{ github.workspace }}
 
-    runs-on: ${{ matrix.os }}
+      - name: Build
+        run: cmake --build ${{ github.workspace }}/build
 
+  build-windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 

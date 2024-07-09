@@ -11,13 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: openrndr/setup-opengl@v1.1
+
+      - name: Setup OpenGL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-utils xvfb
+          xvfb-run glxinfo
 
       - name: Configure
         run: cmake -B ${{ github.workspace }}/build -S ${{ github.workspace }}
 
       - name: Build
-        run: cmake --build ${{ github.workspace }}/build
+        run: cmake --build ${{ github.workspace }}/build --target winx
 
   build-windows:
     runs-on: windows-latest
@@ -28,4 +33,4 @@ jobs:
         run: cmake -B ${{ github.workspace }}/build -S ${{ github.workspace }}
 
       - name: Build
-        run: cmake --build ${{ github.workspace }}/build
+        run: cmake --build ${{ github.workspace }}/build --target winx

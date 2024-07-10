@@ -212,36 +212,110 @@ double winxGetTime();
 #if defined(__unix__) || defined(__linux__)
 #	define WINX_GLX
 
+// BEGIN X11 KEYS
 // based on https://code.woboq.org/kde/include/X11/keysymdef.h.html
-#	define WXK_SPACE    ' '
-#	define WXK_TAB 		'\t'
-#	define WXK_ESC      0xff1b // XK_Escape
-#	define WXK_ENTER    0xff0d // XK_Return
-#	define WXK_BACK     0xff08 // XK_BackSpace
-#	define WXK_UP       0xff52 // XK_Up
-#	define WXK_DOWN     0xff54 // XK_Down
-#	define WXK_LEFT     0xff51 // XK_Left
-#	define WXK_RIGHT    0xff53 // XK_Right
-#	define WXB_LEFT     1 // Button1 (X.h)
-#	define WXB_CENTER   2 // Button2 (X.h)
-#	define WXB_RIGHT    3 // Button3 (X.h)
+#	ifndef WINX_NO_KEYS
+#	define WXK_SPACE      0x0020 // XK_Space
+#	define WXK_TAB        0xff09 // XK_Tab
+#	define WXK_PAGE_UP    0xff55 // XK_Page_Up
+#	define WXK_PAGE_DOWN  0xff56 // XK_Page_Down
+#	define WXK_END        0xff57 // XK_End
+#	define WXK_PRINT      0xff61 // XK_Print
+#	define WXK_ESC        0xff1b // XK_Escape
+#	define WXK_ENTER      0xff0d // XK_Return
+#	define WXK_BACK       0xff08 // XK_BackSpace
+#	define WXK_DELETE     0xffff // WX_Delete
+#	define WXK_UP         0xff52 // XK_Up
+#	define WXK_DOWN       0xff54 // XK_Down
+#	define WXK_LEFT       0xff51 // XK_Left
+#	define WXK_RIGHT      0xff53 // XK_Right
+#	define WXK_SHIFT      0xffe1 // XK_Shift_L
+#	define WXK_CONTROL    0xffe3 // XK_Control_L
+#	define WXK_ALT        0xffe9 // XK_Alt_L
+#	define WXK_F1         0xffbe // XK_F1
+#	define WXK_F2         0xffbf // XK_F2
+#	define WXK_F3         0xffc0 // XK_F3
+#	define WXK_F4         0xffc1 // XK_F4
+#	define WXK_F5         0xffc2 // XK_F5
+#	define WXK_F6         0xffc3 // XK_F6
+#	define WXK_F7         0xffc4 // XK_F7
+#	define WXK_F8         0xffc5 // XK_F8
+#	define WXK_F9         0xffc6 // XK_F9
+#	define WXK_F10        0xffc7 // XK_F10
+#	define WXK_F11        0xffc8 // XK_F11
+#	define WXK_F12        0xffc9 // XK_F12
+#	define WXK_F13        0xffca // XK_F13
+#	define WXK_F14        0xffcb // XK_F14
+#	define WXK_F15        0xffcc // XK_F15
+#	define WXK_F16        0xffcd // XK_F16
+#	define WXK_0          0x0030 // XK_0
+#	define WXK_1          0x0031 // XK_1
+#	define WXK_2          0x0032 // XK_2
+#	define WXK_3          0x0033 // XK_3
+#	define WXK_4          0x0034 // XK_4
+#	define WXK_5          0x0035 // XK_5
+#	define WXK_6          0x0036 // XK_6
+#	define WXK_7          0x0037 // XK_7
+#	define WXK_8          0x0038 // XK_8
+#	define WXK_9          0x0039 // XK_9
+#	define WXB_LEFT       1 // Button1 (X.h)
+#	define WXB_CENTER     2 // Button2 (X.h)
+#	define WXB_RIGHT      3 // Button3 (X.h)
+#	endif
 
 #elif defined(_WIN32) || defined(_WIN64)
 #	define WINX_WINAPI
 
+// BEGIN WIN KEYS
 // based on https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
-#	define WXK_SPACE    ' '
-#	define WXK_TAB      '\t'
-#	define WXK_ESC      0x1B // VK_ESCAPE
-#	define WXK_ENTER    0x0D // VK_RETURN
-#	define WXK_BACK     0x08 // VK_BACK
-#	define WXK_UP       0x26 // VK_UP
-#	define WXK_DOWN     0x28 // VK_DOWN
-#	define WXK_LEFT     0x25 // VK_LEFT
-#	define WXK_RIGHT    0x27 // VK_RIGHT
-#	define WXB_LEFT     1
-#	define WXB_CENTER   2
-#	define WXB_RIGHT    3
+#	ifndef WINX_NO_KEYS
+#	define WXK_SPACE      0x20 // VK_SPACE
+#	define WXK_TAB        0x09 // VK_TAB
+#	define WXK_PAGE_UP    0x21 // VK_PRIOR
+#	define WXK_PAGE_DOWN  0x22 // VK_NEXT
+#	define WXK_END        0x23 // VK_END
+#	define WXK_PRINT      0x2A // VK_PRINT
+#	define WXK_ESC        0x1B // VK_ESCAPE
+#	define WXK_ENTER      0x0D // VK_RETURN
+#	define WXK_BACK       0x08 // VK_BACK
+#	define WXK_DELETE     0x2E // VK_DELETE
+#	define WXK_UP         0x26 // VK_UP
+#	define WXK_DOWN       0x28 // VK_DOWN
+#	define WXK_LEFT       0x25 // VK_LEFT
+#	define WXK_RIGHT      0x27 // VK_RIGHT
+#	define WXK_SHIFT      0xA0 // VK_LSHIFT
+#	define WXK_CONTROL    0xA2 // VK_LCONTROL
+#	define WXK_ALT        0x12 // VK_MENU
+#	define WXK_F1         0x70 // VK_F1
+#	define WXK_F2         0x71 // VK_F2
+#	define WXK_F3         0x72 // VK_F3
+#	define WXK_F4         0x73 // VK_F4
+#	define WXK_F5         0x74 // VK_F5
+#	define WXK_F6         0x75 // VK_F6
+#	define WXK_F7         0x76 // VK_F7
+#	define WXK_F8         0x77 // VK_F8
+#	define WXK_F9         0x78 // VK_F9
+#	define WXK_F10        0x79 // VK_F10
+#	define WXK_F11        0x7A // VK_F11
+#	define WXK_F12        0x7B // VK_F12
+#	define WXK_F13        0x7C // VK_F13
+#	define WXK_F14        0x7D // VK_F14
+#	define WXK_F15        0x7E // VK_F15
+#	define WXK_F16        0x7F // VK_F16
+#	define WXK_0          0x30 // VK_0
+#	define WXK_1          0x31 // VK_1
+#	define WXK_2          0x32 // VK_2
+#	define WXK_3          0x33 // VK_3
+#	define WXK_4          0x34 // VK_4
+#	define WXK_5          0x35 // VK_5
+#	define WXK_6          0x36 // VK_6
+#	define WXK_7          0x37 // VK_7
+#	define WXK_8          0x38 // VK_8
+#	define WXK_9          0x39 // VK_9
+#	define WXB_LEFT       1
+#	define WXB_CENTER     2
+#	define WXB_RIGHT      3
+#	endif
 
 #endif
 

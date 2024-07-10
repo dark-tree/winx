@@ -23,6 +23,9 @@ jobs:
       - name: CMake Build
         run: cmake --build ${{ github.workspace }}/build --target winx
 
+      - name: Key Check
+        run: ./util/check-keys.py
+
   build-windows:
     runs-on: windows-latest
     steps:

@@ -524,7 +524,7 @@ typedef struct {
 	WinxCursor* cursor_icon;
 	WinxCursorEventHandle cursor;
 	WinxButtonEventHandle button;
-	WinxKeybordEventHandle keyboard;
+	WinxKeyboardEventHandle keyboard;
 	WinxScrollEventHandle scroll;
 	WinxCloseEventHandle close;
 	WinxResizeEventHandle resize;

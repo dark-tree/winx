@@ -12,14 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup OpenGL
+      - name: OpenGL Setup
         run: |
           sudo apt-get update
-          sudo apt-get install -y mesa-utils xvfb libglu1-mesa-dev freeglut3-dev mesa-common-dev libxcursor-dev
-          xvfb-run glxinfo
+          sudo apt-get install -y libglu1-mesa-dev freeglut3-dev mesa-common-dev libxcursor-dev
 
-      - name: Configure
-        run: cmake -B ${{ github.workspace }}/build -S ${{ github.workspace }}
+      - name: CMake Generate
+        run: cmake -B ${{ github.workspace }}/build -S ${{ github.workspace }} -D WINX_BUILD_EXAMPLE=OFF
 
-      - name: Build
+      - name: CMake Build
+        run: cmake --build ${{ github.workspace }}/build --target winx
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CMake Generate
+        run: cmake -B ${{ github.workspace }}/build -S ${{ github.workspace }} -D WINX_BUILD_EXAMPLE=OFF
+
+      - name: CMake Build
         run: cmake --build ${{ github.workspace }}/build --target winx

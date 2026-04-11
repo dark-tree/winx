@@ -26,8 +26,8 @@ int main() {
 	// init OpenGL example
 	init();
 
-	winxSetCloseEventHandle(closeEventHandle);
-	winxSetResizeEventHandle(resizeEventHandle);
+	winxSetCloseEventHandler(closeEventHandle);
+	winxSetResizeEventHandler(resizeEventHandle);
 
 	while(1) {
 		draw();

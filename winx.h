@@ -30,23 +30,23 @@
  *	designed to easily create an OpenGL 3.0+ compatible window on both Windows and Linux (as well as on MacOS
  *	through X11).
  *
- *	To create a new window call the 'winxOpen' function. Note: WINX is a state machine and supports only
- *	one window per thread! If that call returns true window should have been successfully initialized and
- *	an OpenGL context created. Otherwise use 'winxGetError' to get the error message string.
+ *	To create a new window call the 'winxOpen()' function. Note: WINX is a state machine and supports only
+ *	one window per process! If that call returned true the window have been successfully initialized and
+ *	an OpenGL context created. Otherwise, use 'winxGetError()' to get the error message string.
  *
- *	if (!winxOpen(500, 300, "test")) {
+ *	if (!winxOpen(500, 300, "My Window Title")) {
  *		printf("Error occured! %s\n", winxGetError());
  *		exit(1);
  *	}
  *
- *	Some properties of the window created with 'winxOpen' can be modified with "hints" that have to be set prior to its
- *	creation with the 'winxHint' function. Note that WINX is allowed to ignore impossible to satisfy hints! See the list of available
+ *	Some properties of the windows created with 'winxOpen()' can be modified with "hints" that have to be set PRIOR to its
+ *	creation with the 'winxHint()' function. Note that WINX is allowed to ignore impossible to satisfy hints! See the list of available
  *	hints below the function list, under "hint keys".
  *
- *	Once a window is open you can begin the render loop and call 'winxSwapBuffers' and 'winxPollEvents'.
+ *	Once a window is open you can begin the render loop and call 'winxSwapBuffers()' and 'winxPollEvents()'.
  *	To register callbacks for window events use the 'winxSet*EventHandle' family of functions and their respective
- *	'Winx*EventHandle' callback types. Clicking on a "close window" button can be detected with the 'winxSetCloseEventHandle'.
- *	The Vsync behaviour can also be changed after window creation using 'winxSetVsync'.
+ *	'Winx*EventHandle()' callback types. Clicking on a "close window" button can be detected with the 'winxSetCloseEventHandle()'.
+ *	The Vsync behaviour can also be changed after window creation using 'winxSetVsync()'.
  *
  *	while(1) {
  *		// draw here
@@ -55,7 +55,7 @@
  *		winxPollEvents(); // poll events and call user event callbacks
  *	}
  *
- *	To close the window call 'winxClose'. Note that this doesn't reset any modified window hints!
+ *	To close the window call 'winxClose()'. Note that this doesn't reset any modified window hints!
  */
 
 #ifndef WINX_H
@@ -81,108 +81,108 @@ typedef void (*WinxCloseEventHandle)(void);
 typedef void (*WinxResizeEventHandle)(int width, int height);
 typedef void (*WinxFocusEventHandle)(bool focused);
 
-/// set a window hint
-/// has to be called prior to winxOpen()
+/// Set a window hint.
+/// Affects future calls to winxOpen().
 void winxHint(int hint, int value);
 
-/// return and clear last winx error
-/// returns a NULL pointer if there was no error
+/// Return and clear last winx error.
+/// Returns a NULL pointer if there was no error reported.
 char* winxGetError();
 
-/// used to open new window with a given size and title
-/// the title can later be changed with winxSetTitle()
+/// Used to open a new window with a given size and title.
+/// The title can later be changed with winxSetTitle().
 bool winxOpen(int width, int height, const char* title);
 
-/// process pending events
-/// this will call the registered event handlers
+/// Process pending events of the current window.
+/// This will call (on the same thread) the registered event handlers.
 void winxPollEvents();
 
-/// swap display buffers
-/// this needs to be called every frame
+/// Swap display buffers of the current window.
+/// This needs to be called every frame.
 void winxSwapBuffers();
 
-/// used to close current window
-/// this resets all internal state apart from the window hints
+/// Close current window.
+/// This resets all internal state apart from the window hints, which remain unchanged.
 void winxClose();
 
-/// set title for current window
-/// UTF-8 strings should be supported by this function
+/// Set title for current window.
+/// UTF-8 strings are supported by this function.
 void winxSetTitle(const char* title);
 
-/// set the icon of the current window to a RGBA image
-/// pass WINX_ICON_DEFAULT as buffer to reset the icon (width and height will be ignored)
+/// Set the icon of the current window to an RGBA, 8 bit per channel, image.
+/// Pass WINX_ICON_DEFAULT as buffer to reset the icon (width and height will be ignored).
 void winxSetIcon(int width, int height, unsigned char* buffer);
 
-/// set desired vsync behaviour for current window
-/// use one of WINX_VSYNC_DISABLED, WINX_VSYNC_ENABLED, or WINX_VSYNC_ADAPTIVE
+/// Set desired vsync behavior for current window.
+/// Use one of WINX_VSYNC_DISABLED, WINX_VSYNC_ENABLED, or WINX_VSYNC_ADAPTIVE.
 void winxSetVsync(int vsync);
 
-/// check if the current window is focused
-/// you can also register a focus event handle using winxSetFocusEventHandle()
+/// Check if the current window is focused.
+/// You can also register a focus event handle using winxSetFocusEventHandle().
 bool winxGetFocus();
 
-/// focus the current window
-/// this call is not guaranteed to be respected by the system
+/// Focus the current window.
+/// This call is not guaranteed to be respected by the system.
 void winxSetFocus();
 
-/// constrain the cursor pointer to the current window
-/// this call is known to sometimes be ignored inside Virtual Machines
+/// Constrain the cursor pointer to the current window,
+/// this call is known to sometimes be ignored inside Virtual Machines.
 void winxSetCursorCapture(bool capture);
 
-/// create a icon for the cursor from a RGBA image
-/// the returned value should be freed with winxDeleteCursorIcon() when no longer needed
+/// Create an icon for the cursor from an RGBA, 8 bit per channel, image.
+/// The returned value should be freed with winxDeleteCursorIcon() when no longer needed.
 WinxCursor* winxCreateCursorIcon(int width, int height, unsigned char* buffer, int x, int y);
 
-/// create an empty icon for the cursor
-/// a helper method for creating an fully transparent cursor icon
+/// Create an empty icon for the cursor. Helper method for creating a
+/// fully transparent cursor icon. The returned value should be freed with winxDeleteCursorIcon() when no longer needed.
 WinxCursor* winxCreateNullCursorIcon();
 
-/// free the allocated icon
-/// deletes system resources associated with the icon if needed
+/// Free the allocated icon.
+/// Deletes system resources associated with the icon.
 void winxDeleteCursorIcon(WinxCursor* cursor);
 
-/// set the cursor icon for the current window
-/// pass WINX_ICON_DEFAULT to revert to the default system value
+/// Set the cursor icon for the current window.
+/// Pass WINX_ICON_DEFAULT to revert to the default system value.
 void winxSetCursorIcon(WinxCursor* cursor);
 
-/// set the position of the cursor within the current window
-/// this call is known to sometimes be ignored inside Virtual Machines
+/// Set the position of the cursor within the current window,
+/// this call is known to sometimes be ignored inside Virtual Machines.
 void winxSetCursorPos(int x, int y);
 
-/// set the handle for cursor movement events for current window
-/// pass NULL to unset the associated event handler (if any)
-void winxSetCursorEventHandle(WinxCursorEventHandle handle);
+/// Set the handle for cursor movement events for the current window.
+/// Pass NULL to unset the currently associated event handler.
+void winxSetCursorEventHandler(WinxCursorEventHandle handle);
 
-/// set the handle for cursor click events for current window
-/// pass NULL to unset the associated event handler (if any)
-void winxSetButtonEventHandle(WinxButtonEventHandle handle);
+/// Set the handle for cursor click events for current window.
+/// Pass NULL to unset the currently associated event handler.
+void winxSetButtonEventHandler(WinxButtonEventHandle handle);
 
-/// set the handle for keyboard events for current window
-/// pass NULL to unset the associated event handler (if any)
-void winxSetKeyboardEventHandle(WinxKeyboardEventHandle handle);
+/// Set the handle for keyboard events for current window.
+/// Pass NULL to unset the currently associated event handler.
+void winxSetKeyboardEventHandler(WinxKeyboardEventHandle handle);
 
-/// set the handle for cursor scroll for current window
-/// pass NULL to unset the associated event handler (if any)
-void winxSetScrollEventHandle(WinxScrollEventHandle handle);
+/// Set the handle for cursor scroll for current window.
+/// Pass NULL to unset the currently associated event handler.
+void winxSetScrollEventHandler(WinxScrollEventHandle handle);
 
-/// set the handle for window close button for current window
-/// pass NULL to unset the associated event handler (if any)
-void winxSetCloseEventHandle(WinxCloseEventHandle handle);
+/// Set the handle for window close button for current window.
+/// Pass NULL to unset the currently associated event handler.
+void winxSetCloseEventHandler(WinxCloseEventHandle handle);
 
-/// set the handle for window resize event for current window
-/// pass NULL to unset the associated event handler (if any)
-void winxSetResizeEventHandle(WinxResizeEventHandle handle);
+/// Set the handle for window resize event for current window.
+/// Pass NULL to unset the currently associated event handler.
+void winxSetResizeEventHandler(WinxResizeEventHandle handle);
 
-/// set the handle for window focus events for current window
-/// pass NULL to unset the associated event handler (if any)
-void winxSetFocusEventHandle(WinxFocusEventHandle handle);
+/// Set the handle for window focus events for current window.
+/// Pass NULL to unset the currently associated event handler.
+void winxSetFocusEventHandler(WinxFocusEventHandle handle);
 
-/// reset all even handles for current window
-/// you can also pass NULL to a specific event handler setter to reset it
-void winxResetEventHandles();
+/// Reset all even handles for current window.
+/// You can also pass NULL to a specific event handler setter to reset it
+void winxResetEventHandlers();
 
-/// return a time in seconds since the winxOpen() was called (if successful)
-/// this function emulates the behaviour of glfwGetTime()
+/// Return a time, in seconds, since the winxOpen() was called.
+/// This function emulates the behavior of glfwGetTime().
 double winxGetTime();
 
 #define WINX_ICON_DEFAULT NULL

@@ -1,3 +1,26 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2022 magistermaks
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 #include "winx.h"
 
@@ -61,20 +84,544 @@ void winxHint(int hint, int value) {
 // begin winx GLX implementation
 #if defined(WINX_GLX)
 
+#include <time.h>
+
+#if defined(WINX_USE_SYSTEM_LIBS)
+
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/Xcursor/Xcursor.h>
 #include <GL/glx.h>
-#include <time.h>
 
-// copied from glxext.h
-typedef int (*PFNGLXSWAPINTERVALMESAPROC) (unsigned int interval);
-typedef void (*PFNGLXSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawable, int interval);
-typedef GLXContext (*PFNGLXCREATECONTEXTATTRIBSARBPROC) (Display *dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
+static void winxInitBackend() {
+	// do nothing
+}
 
-static PFNGLXSWAPINTERVALMESAPROC glXSwapIntervalMESA;
-static PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT;
-static PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB;
+static void winxCloseBackend() {
+
+}
+
+#else
+
+#include <dlfcn.h>
+
+/*
+ * Begin X11/GLX header for Linux targets.
+ *
+ * This region contains a subset of X11/GLX function, types, struct, and
+ * enum definitions that are needed for Winx as we avoid linking with Linux
+ * libraries to not have any dependencies on development packages, and
+ * compile/link time configuration.
+ */
+
+#define GLX_USE_GL 1
+#define GLX_BUFFER_SIZE 2
+#define GLX_LEVEL 3
+#define GLX_RGBA 4
+#define GLX_DOUBLEBUFFER 5
+#define GLX_STEREO 6
+#define GLX_AUX_BUFFERS 7
+#define GLX_RED_SIZE 8
+#define GLX_GREEN_SIZE 9
+#define GLX_BLUE_SIZE 10
+#define GLX_ALPHA_SIZE 11
+#define GLX_DEPTH_SIZE 12
+#define GLX_STENCIL_SIZE 13
+#define GLX_ACCUM_RED_SIZE 14
+#define GLX_ACCUM_GREEN_SIZE 15
+#define GLX_ACCUM_BLUE_SIZE 16
+#define GLX_ACCUM_ALPHA_SIZE 17
+
+#define NoEventMask 0L
+#define KeyPressMask (1L<<0)
+#define KeyReleaseMask (1L<<1)
+#define ButtonPressMask (1L<<2)
+#define ButtonReleaseMask (1L<<3)
+#define EnterWindowMask (1L<<4)
+#define LeaveWindowMask (1L<<5)
+#define PointerMotionMask (1L<<6)
+#define PointerMotionHintMask (1L<<7)
+#define Button1MotionMask (1L<<8)
+#define Button2MotionMask (1L<<9)
+#define Button3MotionMask (1L<<10)
+#define Button4MotionMask (1L<<11)
+#define Button5MotionMask (1L<<12)
+#define ButtonMotionMask (1L<<13)
+#define KeymapStateMask (1L<<14)
+#define ExposureMask (1L<<15)
+#define VisibilityChangeMask (1L<<16)
+#define StructureNotifyMask (1L<<17)
+#define ResizeRedirectMask (1L<<18)
+#define SubstructureNotifyMask (1L<<19)
+#define SubstructureRedirectMask (1L<<20)
+#define FocusChangeMask (1L<<21)
+#define PropertyChangeMask (1L<<22)
+#define ColormapChangeMask (1L<<23)
+#define OwnerGrabButtonMask (1L<<24)
+
+#define GLX_RENDER_TYPE 0x8011
+#define GLX_DRAWABLE_TYPE 0x8010
+#define GLX_SAMPLE_BUFFERS 0x186a0
+#define GLX_SAMPLES 0x186a1
+
+#define GLX_RGBA_BIT 0x00000001
+#define GLX_WINDOW_BIT 0x00000001
+
+#define KeyPress 2
+#define KeyRelease 3
+#define ButtonPress 4
+#define ButtonRelease 5
+#define MotionNotify 6
+#define EnterNotify 7
+#define LeaveNotify 8
+#define FocusIn 9
+#define FocusOut 10
+#define KeymapNotify 11
+#define Expose 12
+#define GraphicsExpose 13
+#define NoExpose 14
+#define VisibilityNotify 15
+#define CreateNotify 16
+#define DestroyNotify 17
+#define UnmapNotify 18
+#define MapNotify 19
+#define MapRequest 20
+#define ReparentNotify 21
+#define ConfigureNotify 22
+#define ConfigureRequest 23
+#define GravityNotify 24
+#define ResizeRequest 25
+#define CirculateNotify 26
+#define CirculateRequest 27
+#define PropertyNotify 28
+#define SelectionClear 29
+#define SelectionRequest 30
+#define SelectionNotify 31
+#define ColormapNotify 32
+#define ClientMessage 33
+#define MappingNotify 34
+#define GenericEvent 35
+
+#define GrabModeSync 0
+#define GrabModeAsync 1
+
+#define None 0L
+
+#define ParentRelative 1L
+#define CopyFromParent 0L
+#define PointerWindow 0L
+#define InputFocus 1L
+#define PointerRoot 1L
+#define AnyPropertyType 0L
+#define AnyKey 0L
+#define AnyButton 0L
+#define AllTemporary 0L
+#define CurrentTime 0L
+
+#define NoSymbol 0L
+
+#define CWBackPixmap (1L<<0)
+#define CWBackPixel (1L<<1)
+#define CWBorderPixmap (1L<<2)
+#define CWBorderPixel (1L<<3)
+#define CWBitGravity (1L<<4)
+#define CWWinGravity (1L<<5)
+#define CWBackingStore (1L<<6)
+#define CWBackingPlanes (1L<<7)
+#define CWBackingPixel (1L<<8)
+#define CWOverrideRedirect (1L<<9)
+#define CWSaveUnder (1L<<10)
+#define CWEventMask (1L<<11)
+#define CWDontPropagate (1L<<12)
+#define CWColormap (1L<<13)
+#define CWCursor (1L<<14)
+
+#define AllocNone 0
+#define AllocAll 1
+
+#define InputOutput 1
+#define InputOnly 2
+
+#define GLX_CONTEXT_DEBUG_BIT_ARB 0x00000001
+#define GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
+#define GLX_CONTEXT_MAJOR_VERSION_ARB 0x2091
+#define GLX_CONTEXT_MINOR_VERSION_ARB 0x2092
+#define GLX_CONTEXT_FLAGS_ARB 0x2094
+
+#define GLX_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
+#define GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
+#define GLX_CONTEXT_PROFILE_MASK_ARB 0x9126
+
+#define GLX_CONTEXT_ROBUST_ACCESS_BIT_ARB 0x00000004
+#define GLX_LOSE_CONTEXT_ON_RESET_ARB 0x8252
+#define GLX_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB 0x8256
+#define GLX_NO_RESET_NOTIFICATION_ARB 0x8261
+
+#define PropModeReplace 0
+#define PropModePrepend 1
+#define PropModeAppend 2
+
+#define RevertToNone (int)None
+#define RevertToPointerRoot (int)PointerRoot
+#define RevertToParent 2
+
+/*
+ * End of the enum section, now we defiend the basic types
+ * that are using in X11/GLX structures.
+ */
+
+typedef unsigned long XID;
+typedef unsigned long Time;
+
+typedef XID GLXDrawable;
+typedef XID Cursor;
+typedef XID Window;
+typedef XID Atom;
+typedef XID VisualID;
+typedef XID Pixmap;
+typedef XID Colormap;
+typedef XID KeySym;
+
+typedef void* GLXFBConfig;
+typedef void* GLXContext;
+typedef void Display;
+typedef void XExtData;
+typedef void Visual;
+typedef int Bool;
+
+typedef unsigned int XcursorUInt;
+typedef XcursorUInt	XcursorDim;
+typedef XcursorUInt	XcursorPixel;
+
+/*
+ * End of typedefs. Many of the following structs are
+ * needed to handle events. In places where a struct's content is not used
+ * directly (e.g. it is passed as a pointer and never dereferenced) we used
+ * a typedef to void instead, but still, in some cases, we neded the actual struct.
+ * Those where begrudgingly added below.
+ */
+
+typedef struct {
+	Pixmap background_pixmap;
+	unsigned long background_pixel;
+	Pixmap border_pixmap;
+	unsigned long border_pixel;
+	int bit_gravity;
+	int win_gravity;
+	int backing_store;
+	unsigned long backing_planes;
+	unsigned long backing_pixel;
+	Bool save_under;
+	long event_mask;
+	long do_not_propagate_mask;
+	Bool override_redirect;
+	Colormap colormap;
+	Cursor cursor;
+} XSetWindowAttributes;
+
+typedef struct {
+	Visual* visual;
+	VisualID visualid;
+	int screen;
+	int depth;
+	int clazz;
+	unsigned long red_mask;
+	unsigned long green_mask;
+	unsigned long blue_mask;
+	int colormap_size;
+	int bits_per_rgb;
+} XVisualInfo;
+
+typedef struct {
+	int type;
+	unsigned long serial;
+	Bool send_event;
+	Display *display;
+	Window window;
+	Window root;
+	Window subwindow;
+	Time time;
+	int x, y;
+	int x_root, y_root;
+	unsigned int state;
+	unsigned int keycode;
+	Bool same_screen;
+} XKeyEvent;
+
+typedef struct {
+	int type;
+	unsigned long serial;
+	Bool send_event;
+	Display *display;
+	Window window;
+	Window root;
+	Window subwindow;
+	Time time;
+	int x, y;
+	int x_root, y_root;
+	unsigned int state;
+	unsigned int button;
+	Bool same_screen;
+} XButtonEvent;
+
+typedef struct {
+	int type;
+	unsigned long serial;
+	Bool send_event;
+	Display *display;
+	Window window;
+	Window root;
+	Window subwindow;
+	Time time;
+	int x, y;
+	int x_root, y_root;
+	unsigned int state;
+	char is_hint;
+	Bool same_screen;
+} XMotionEvent;
+
+typedef struct {
+	int type;
+	unsigned long serial;
+	Bool send_event;
+	Display *display;
+	Window event;
+	Window window;
+	int x, y;
+	int width, height;
+	int border_width;
+	Window above;
+	Bool override_redirect;
+} XConfigureEvent;
+
+typedef struct {
+	int type;
+	unsigned long serial;
+	Bool send_event;
+	Display *display;
+	Window window;
+	Atom message_type;
+	int format;
+	union {
+		char b[20];
+		short s[10];
+		long l[5];
+	} data;
+} XClientMessageEvent;
+
+typedef union {
+	int type;
+	XKeyEvent xkey;
+	XButtonEvent xbutton;
+	XMotionEvent xmotion;
+	XConfigureEvent xconfigure;
+	XClientMessageEvent xclient;
+	long pad[24];
+} XEvent;
+
+typedef struct {
+	XcursorUInt version;
+	XcursorDim size;
+	XcursorDim width;
+	XcursorDim height;
+	XcursorDim xhot;
+	XcursorDim yhot;
+	XcursorUInt delay;
+	XcursorPixel* pixels;
+} XcursorImage;
+
+/*
+ * X11 function signatures
+ */
+
+typedef int (*PFN_XGrabPointer) (Display* display, Window grab_window, Bool owner_events, unsigned int event_mask, int pointer_mode, int keyboard_mode, Window confine_to, Cursor cursor, Time time);
+typedef int (*PFN_XUngrabPointer) (Display* display, Time time);
+typedef int (*PFN_XDefineCursor) (Display* display, Window w, Cursor cursor);
+typedef int (*PFN_XUndefineCursor) (Display* display, Window w);
+typedef Display* (*PFN_XOpenDisplay) (const char* display_name);
+typedef GLXContext* (*PFN_glXCreateContext) (Display *dpy, XVisualInfo *vis, GLXContext* shareList, Bool direct );
+typedef Bool (*PFN_glXMakeCurrent) (Display *dpy, GLXDrawable drawable, GLXContext* ctx);
+typedef void (*PFN_glXDestroyContext) (Display *dpy, GLXContext* ctx );
+typedef Colormap (*PFN_XCreateColormap) (Display* display, Window w, Visual* visual, int alloc);
+typedef Atom (*PFN_XInternAtom) (Display* display, const char* atom_name, Bool only_if_exists);
+typedef Window (*PFN_XCreateWindow) (Display* display, Window parent, int x, int y, unsigned int width, unsigned int height, unsigned int border_width, int depth, unsigned int clazz, Visual* visual, unsigned long valuemask, XSetWindowAttributes* attributes);
+typedef int (*PFN_XMapWindow) (Display* display, Window w);
+typedef int (*PFN_XFree) (void* data);
+typedef int (*PFN_XWarpPointer) (Display* display, Window src_w, Window dest_w, int src_x, int src_y, unsigned int src_width, unsigned int src_height, int dest_x, int dest_y);
+typedef int (*PFN_XNextEvent) (Display* display, XEvent* event_return);
+typedef int (*PFN_XFlush) (Display* display);
+typedef int (*PFN_XRaiseWindow) (Display* display, Window w);
+typedef int (*PFN_XSetInputFocus) (Display* display, Window focus, int revert_to, Time time);
+typedef int (*PFN_XGetInputFocus) (Display* display, Window* focus_return, int* revert_to_return);
+typedef int (*PFN_XFreeCursor) (Display* display, Cursor cursor);
+typedef int (*PFN_XChangeProperty) (Display* display, Window w, Atom property, Atom type, int format, int mode, const unsigned char* data, int nelements);
+typedef int (*PFN_XStoreName) (Display* display, Window w, const char* window_name);
+typedef int (*PFN_XSetIconName) (Display* display, Window w, const char* icon_name);
+typedef int (*PFN_XDestroyWindow) (Display* display, Window w);
+typedef int (*PFN_XCloseDisplay) (Display* display);
+typedef int (*PFN_XSetWMProtocols) (Display* display, Window w, Atom* protocols, int count);
+typedef int (*PFN_XPending) (Display* display);
+typedef KeySym (*PFN_XLookupKeysym) (XKeyEvent* key_event, int index);
+typedef int (*PFN_XDefaultScreen) (Display* display);
+typedef Window (*PFN_XRootWindow) (Display* display, int screen_number);
+
+/*
+ * GLX function signatures
+ */
+
+typedef void* (*PFN_glXGetProcAddress) (const char* procname);
+typedef GLXFBConfig* (*PFN_glXChooseFBConfig) (Display* dpy, int screen, const int* attrib_list, int* nelements);
+typedef XVisualInfo* (*PFN_glXGetVisualFromFBConfig) (Display* dpy, GLXFBConfig* config);
+typedef GLXDrawable (*PFN_glXGetCurrentDrawable) ();
+typedef void (*PFN_glXSwapBuffers) (Display *dpy, GLXDrawable drawable);
+
+/*
+ * Xcursor function signatures
+ */
+
+typedef XcursorImage* (*PFN_XcursorImageCreate) (int width, int height);
+typedef void (*PFN_XcursorImageDestroy) (XcursorImage *image);
+typedef Cursor (*PFN_XcursorImageLoadCursor) (Display *dpy, const XcursorImage *image);
+
+/*
+ * Actual function pointers, those will be filled-in later using
+ * dlopen() and dlsym()
+ */
+
+static bool loaded = false;
+
+static PFN_XGrabPointer XGrabPointer;
+static PFN_XUngrabPointer XUngrabPointer;
+static PFN_XDefineCursor XDefineCursor;
+static PFN_XUndefineCursor XUndefineCursor;
+static PFN_XOpenDisplay XOpenDisplay;
+static PFN_XCreateColormap XCreateColormap;
+static PFN_XInternAtom XInternAtom;
+static PFN_XCreateWindow XCreateWindow;
+static PFN_XMapWindow XMapWindow;
+static PFN_XFree XFree;
+static PFN_XWarpPointer XWarpPointer;
+static PFN_XNextEvent XNextEvent;
+static PFN_XFlush XFlush;
+static PFN_XRaiseWindow XRaiseWindow;
+static PFN_XSetInputFocus XSetInputFocus;
+static PFN_XGetInputFocus XGetInputFocus;
+static PFN_XFreeCursor XFreeCursor;
+static PFN_XChangeProperty XChangeProperty;
+static PFN_XStoreName XStoreName;
+static PFN_XSetIconName XSetIconName;
+static PFN_XDestroyWindow XDestroyWindow;
+static PFN_XCloseDisplay XCloseDisplay;
+static PFN_XSetWMProtocols XSetWMProtocols;
+static PFN_XPending XPending;
+static PFN_XLookupKeysym XLookupKeysym;
+static PFN_XDefaultScreen XDefaultScreen;
+static PFN_XRootWindow XRootWindow;
+
+/*
+ * GLX function pointers
+ */
+
+static PFN_glXGetProcAddress glXGetProcAddress;
+static PFN_glXChooseFBConfig glXChooseFBConfig;
+static PFN_glXGetVisualFromFBConfig glXGetVisualFromFBConfig;
+static PFN_glXCreateContext glXCreateContext;
+static PFN_glXMakeCurrent glXMakeCurrent;
+static PFN_glXDestroyContext glXDestroyContext;
+static PFN_glXGetCurrentDrawable glXGetCurrentDrawable;
+static PFN_glXSwapBuffers glXSwapBuffers;
+
+/*
+ * Xcursor
+ */
+
+static PFN_XcursorImageCreate XcursorImageCreate;
+static PFN_XcursorImageDestroy XcursorImageDestroy;
+static PFN_XcursorImageLoadCursor XcursorImageLoadCursor;
+
+static void* lib_x11 = NULL;
+static void* lib_glx = NULL;
+static void* lib_cursor = NULL;
+
+static void winxInitBackend() {
+
+	if (loaded) {
+		return;
+	}
+
+	lib_x11 = dlopen("libX11.so", RTLD_LAZY);
+	XGrabPointer = dlsym(lib_x11, "XGrabPointer");
+	XUngrabPointer = dlsym(lib_x11, "XUngrabPointer");
+	XDefineCursor = dlsym(lib_x11, "XDefineCursor");
+	XUndefineCursor = dlsym(lib_x11, "XUndefineCursor");
+	XOpenDisplay = dlsym(lib_x11, "XOpenDisplay");
+	XCreateColormap = dlsym(lib_x11, "XCreateColormap");
+	XInternAtom = dlsym(lib_x11, "XInternAtom");
+	XCreateWindow = dlsym(lib_x11, "XCreateWindow");
+	XMapWindow = dlsym(lib_x11, "XMapWindow");
+	XFree = dlsym(lib_x11, "XFree");
+	XWarpPointer = dlsym(lib_x11, "XWarpPointer");
+	XNextEvent = dlsym(lib_x11, "XNextEvent");
+	XFlush = dlsym(lib_x11, "XFlush");
+	XRaiseWindow = dlsym(lib_x11, "XRaiseWindow");
+	XSetInputFocus = dlsym(lib_x11, "XSetInputFocus");
+	XGetInputFocus = dlsym(lib_x11, "XGetInputFocus");
+	XFreeCursor = dlsym(lib_x11, "XFreeCursor");
+	XChangeProperty = dlsym(lib_x11, "XChangeProperty");
+	XStoreName = dlsym(lib_x11, "XStoreName");
+	XSetIconName = dlsym(lib_x11, "XSetIconName");
+	XDestroyWindow = dlsym(lib_x11, "XDestroyWindow");
+	XCloseDisplay = dlsym(lib_x11, "XCloseDisplay");
+	XSetWMProtocols = dlsym(lib_x11, "XSetWMProtocols");
+	XPending = dlsym(lib_x11, "XPending");
+	XLookupKeysym = dlsym(lib_x11, "XLookupKeysym");
+	XDefaultScreen = dlsym(lib_x11, "XDefaultScreen");
+	XRootWindow = dlsym(lib_x11, "XRootWindow");
+
+	lib_glx = dlopen("libGLX.so", RTLD_LAZY);
+	glXGetProcAddress = dlsym(lib_glx, "glXGetProcAddress");
+	glXChooseFBConfig = dlsym(lib_glx, "glXChooseFBConfig");
+	glXGetVisualFromFBConfig = dlsym(lib_glx, "glXGetVisualFromFBConfig");
+	glXCreateContext = dlsym(lib_glx, "glXCreateContext");
+	glXMakeCurrent = dlsym(lib_glx, "glXMakeCurrent");
+	glXDestroyContext = dlsym(lib_glx, "glXDestroyContext");
+	glXGetCurrentDrawable = dlsym(lib_glx, "glXGetCurrentDrawable");
+	glXSwapBuffers = dlsym(lib_glx, "glXSwapBuffers");
+
+	lib_cursor = dlopen("libXcursor.so", RTLD_LAZY);
+	XcursorImageCreate = dlsym(lib_glx, "XcursorImageCreate");
+	XcursorImageLoadCursor = dlsym(lib_glx, "XcursorImageLoadCursor");
+	XcursorImageDestroy = dlsym(lib_glx, "XcursorImageDestroy");
+
+	loaded = true;
+}
+
+static void winxCloseBackend() {
+
+	if (!loaded) {
+		return;
+	}
+
+	dlclose(lib_x11);
+	dlclose(lib_glx);
+
+	loaded = false;
+}
+
+#endif
+
+/*
+ * Those functions are always dynamically loaded, even when using system libraries.
+ * We put them here so that we already have the required types defined.
+ */
+
+typedef int (*PFN_glXSwapIntervalMESA) (unsigned int interval);
+typedef void (*PFN_glXSwapIntervalEXT) (Display* dpy, GLXDrawable drawable, int interval);
+typedef GLXContext (*PFN_glXCreateContextAttribsARB) (Display* dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
+
+static PFN_glXSwapIntervalMESA glXSwapIntervalMESA;
+static PFN_glXSwapIntervalEXT glXSwapIntervalEXT;
+static PFN_glXCreateContextAttribsARB glXCreateContextAttribsARB;
 
 // winx cursor image struct
 struct WinxCursor_s {
@@ -104,9 +651,9 @@ typedef struct {
 
 static WinxHandle* winx = NULL;
 
-static __GLXextFuncPtr winxGetProc(const char* name) {
+static void* winxGetProc(const char* name) {
 	if (winxErrorMsg == NULL) {
-		__GLXextFuncPtr proc = glXGetProcAddress((const unsigned char*) name);
+		void* proc = glXGetProcAddress(name);
 
 		if (proc == NULL) {
 			winxErrorMsg = (char*) "glXGetProcAddress: Failed to load function!";
@@ -134,6 +681,9 @@ static void winxUpdateCursorState(bool captured, WinxCursor* cursor) {
 }
 
 bool winxOpen(int width, int height, const char* title) {
+
+	winxInitBackend();
+
 	winx = (WinxHandle*) calloc(1, sizeof(WinxHandle));
 	winx->capture = false;
 
@@ -142,7 +692,7 @@ bool winxOpen(int width, int height, const char* title) {
 	winx->time = spec.tv_sec;
 
 	// set dummy function pointers
-	winxResetEventHandles();
+	winxResetEventHandlers();
 
 	// get display handle
 	winx->display = XOpenDisplay(NULL);
@@ -166,12 +716,12 @@ bool winxOpen(int width, int height, const char* title) {
 		None
 	};
 
-	int screen = DefaultScreen(winx->display);
-	Window root = RootWindow(winx->display, screen);
+	int screen = XDefaultScreen(winx->display);
+	Window root = XRootWindow(winx->display, screen);
 
 	// find frame buffer config matching our attributes
 	int count;
-	GLXFBConfig *fbconfigs = glXChooseFBConfig(winx->display, screen, attributes, &count);
+	GLXFBConfig* fbconfigs = glXChooseFBConfig(winx->display, screen, attributes, &count);
 	if (!fbconfigs || !count) {
 		winxErrorMsg = (char*) "glXChooseFBConfig: Failed to choose a frame buffer config!";
 		return false;
@@ -189,9 +739,7 @@ bool winxOpen(int width, int height, const char* title) {
 	x11_attributes.background_pixel = 0;
 	x11_attributes.border_pixel = 0;
 	x11_attributes.colormap = XCreateColormap(winx->display, root, info->visual, AllocNone);
-
-	x11_attributes.event_mask =
-		StructureNotifyMask | ExposureMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | FocusChangeMask;
+	x11_attributes.event_mask = StructureNotifyMask | ExposureMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | FocusChangeMask;
 
 	unsigned long mask = CWBackPixel | CWBorderPixel | CWColormap | CWEventMask;
 
@@ -213,9 +761,9 @@ bool winxOpen(int width, int height, const char* title) {
 
 	glXMakeCurrent(winx->display, winx->window, context);
 
-	glXCreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC) winxGetProc("glXCreateContextAttribsARB");
-	glXSwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC) glXGetProcAddress((const unsigned char*) "glXSwapIntervalEXT"); // optional
-	glXSwapIntervalMESA = (PFNGLXSWAPINTERVALMESAPROC) glXGetProcAddress((const unsigned char*) "glXSwapIntervalMESA"); // optional
+	glXCreateContextAttribsARB = (PFN_glXCreateContextAttribsARB) winxGetProc("glXCreateContextAttribsARB");
+	glXSwapIntervalEXT = (PFN_glXSwapIntervalEXT) glXGetProcAddress("glXSwapIntervalEXT"); // optional
+	glXSwapIntervalMESA = (PFN_glXSwapIntervalMESA) glXGetProcAddress("glXSwapIntervalMESA"); // optional
 
 	if (winxErrorMsg != NULL) {
 		return false;
@@ -285,12 +833,12 @@ void winxPollEvents() {
 				break;
 
 			case ButtonPress:
-				if (event.xbutton.button == Button4) {
+				if (event.xbutton.button == 4) {
 					winx->scroll(1);
 					break;
 				}
 
-				if (event.xbutton.button == Button5) {
+				if (event.xbutton.button == 5) {
 					winx->scroll(-1);
 					break;
 				}
@@ -355,7 +903,7 @@ void winxSetIcon(int width, int height, unsigned char* buffer) {
 	// X11 expects the icon in format [[long: width] [long: height] [long: bgra]...]...
 
 	const int size = width * height;
-	unsigned long* icon = (unsigned long*) malloc(sizeof(long) * (size + 2));
+	unsigned long* icon = malloc(sizeof(long) * (size + 2));
 
 	icon[0] = width;
 	icon[1] = height;
@@ -389,7 +937,7 @@ WinxCursor* winxCreateCursorIcon(int width, int height, unsigned char* buffer, i
 		pixels[j ++] = buffer[i + 2] | buffer[i + 1] << 8 | buffer[i + 0] << 16 | buffer[i + 3] << 24;
 	}
 
-	WinxCursor* cursor = (WinxCursor*) malloc(sizeof(WinxCursor));
+	WinxCursor* cursor = malloc(sizeof(WinxCursor));
 	cursor->native = XcursorImageLoadCursor(winx->display, image);
     XcursorImageDestroy(image);
 
@@ -658,7 +1206,7 @@ bool winxOpen(int width, int height, const char* title) {
 	HINSTANCE hinstance = GetModuleHandle(NULL);
 
 	// set dummy function pointers
-	winxResetEventHandles();
+	winxResetEventHandlers();
 
 	// register window class
 	const char* clazz = "WinxOpenGLClass";
@@ -1035,43 +1583,47 @@ double winxGetTime() {
 
 #endif // WINAPI
 
-void winxSetCursorEventHandle(WinxCursorEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetCursorEventHandle");
+/*
+ * Platform independent implementation
+ */
+
+void winxSetCursorEventHandler(WinxCursorEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetCursorEventHandler");
 	winx->cursor = handle ? handle : WinxDummyCursorEventHandle;
 }
 
-void winxSetButtonEventHandle(WinxButtonEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetButtonEventHandle");
+void winxSetButtonEventHandler(WinxButtonEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetButtonEventHandler");
 	winx->button = handle ? handle : WinxDummyButtonEventHandle;
 }
 
-void winxSetKeyboardEventHandle(WinxKeyboardEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetKeyboardEventHandle");
+void winxSetKeyboardEventHandler(WinxKeyboardEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetKeyboardEventHandler");
 	winx->keyboard = handle ? handle : WinxDummyKeyboardEventHandle;
 }
 
-void winxSetScrollEventHandle(WinxScrollEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetScrollEventHandle");
+void winxSetScrollEventHandler(WinxScrollEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetScrollEventHandler");
 	winx->scroll = handle ? handle : WinxDummyScrollEventHandle;
 }
 
-void winxSetCloseEventHandle(WinxCloseEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetCloseEventHandle");
+void winxSetCloseEventHandler(WinxCloseEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetCloseEventHandler");
 	winx->close = handle ? handle : WinxDummyCloseEventHandle;
 }
 
-void winxSetResizeEventHandle(WinxResizeEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetResizeEventHandle");
+void winxSetResizeEventHandler(WinxResizeEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetResizeEventHandler");
 	winx->resize = handle ? handle : WinxDummyResizeEventHandle;
 }
 
-void winxSetFocusEventHandle(WinxFocusEventHandle handle) {
-	WINX_CONTEXT_ASSERT("winxSetFocusEventHandle");
+void winxSetFocusEventHandler(WinxFocusEventHandle handle) {
+	WINX_CONTEXT_ASSERT("winxSetFocusEventHandler");
 	winx->focus = handle ? handle : WinxDummyFocusEventHandle;
 }
 
-void winxResetEventHandles() {
-	WINX_CONTEXT_ASSERT("winxResetEventHandles");
+void winxResetEventHandlers() {
+	WINX_CONTEXT_ASSERT("winxResetEventHandlers");
 	winx->cursor = WinxDummyCursorEventHandle;
 	winx->button = WinxDummyButtonEventHandle;
 	winx->keyboard = WinxDummyKeyboardEventHandle;

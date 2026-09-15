@@ -93,6 +93,11 @@ char* winxGetError();
 /// The title can later be changed with winxSetTitle().
 bool winxOpen(int width, int height, const char* title);
 
+/// Return the address of an OpenGL function for the current context.
+/// This should be called only after winxOpen() succeeds.
+/// Returns NULL if the function address could not be loaded.
+void* winxGetProcAddress(const char* name);
+
 /// Process pending events of the current window.
 /// This will call (on the same thread) the registered event handlers.
 void winxPollEvents();

@@ -79,6 +79,20 @@ void winxHint(int hint, int value) {
 	}
 }
 
+static void* winxGetRequiredProc(const char* name) {
+	if (winxErrorMsg == NULL) {
+		void* proc = winxGetProcAddress(name);
+
+		if (proc == NULL) {
+			winxErrorMsg = (char*) "winxGetProcAddress: Failed to load required function!";
+		}
+
+		return proc;
+	}
+
+	return NULL;
+}
+
 #undef SET_HINT
 
 // begin winx GLX implementation
@@ -651,20 +665,6 @@ typedef struct {
 
 static WinxHandle* winx = NULL;
 
-static void* winxGetProc(const char* name) {
-	if (winxErrorMsg == NULL) {
-		void* proc = glXGetProcAddress(name);
-
-		if (proc == NULL) {
-			winxErrorMsg = (char*) "glXGetProcAddress: Failed to load function!";
-		}
-
-		return proc;
-	}
-
-	return NULL;
-}
-
 void* winxGetProcAddress(const char* name) {
 	if (name == NULL || glXGetProcAddress == NULL) {
 		return NULL;
@@ -769,9 +769,9 @@ bool winxOpen(int width, int height, const char* title) {
 
 	glXMakeCurrent(winx->display, winx->window, context);
 
-	glXCreateContextAttribsARB = (PFN_glXCreateContextAttribsARB) winxGetProc("glXCreateContextAttribsARB");
-	glXSwapIntervalEXT = (PFN_glXSwapIntervalEXT) glXGetProcAddress("glXSwapIntervalEXT"); // optional
-	glXSwapIntervalMESA = (PFN_glXSwapIntervalMESA) glXGetProcAddress("glXSwapIntervalMESA"); // optional
+	glXCreateContextAttribsARB = (PFN_glXCreateContextAttribsARB) winxGetRequiredProc("glXCreateContextAttribsARB");
+	glXSwapIntervalEXT = (PFN_glXSwapIntervalEXT) winxGetProcAddress("glXSwapIntervalEXT"); // optional
+	glXSwapIntervalMESA = (PFN_glXSwapIntervalMESA) winxGetProcAddress("glXSwapIntervalMESA"); // optional
 
 	if (winxErrorMsg != NULL) {
 		return false;
@@ -1089,32 +1089,17 @@ typedef struct {
 
 static WinxHandle* winx = NULL;
 
-static PROC winxGetProc(LPCSTR name) {
-	if (winxErrorMsg == NULL) {
-		PROC proc = wglGetProcAddress(name);
-
-		if (proc == NULL) {
-			winxErrorMsg = (char*) "wglGetProcAddress: Failed to load function!";
-		}
-
-		return proc;
+void* winxGetProcAddress(const char* name) {
+	if (name == NULL) {
+		return NULL;
 	}
 
-	return NULL;
-}
-
-void* winxGetProcAddress(const char* name) {
-	if (name == NULL)
-		return NULL;
-
 	PROC proc = wglGetProcAddress(name);
-	if (
-		proc == NULL ||
-		proc == (PROC) 1 ||
-		proc == (PROC) 2 ||
-		proc == (PROC) 3 ||
-		proc == (PROC) -1
-	) {
+
+	// https://wikis.khronos.org/opengl/Load_OpenGL_Functions
+	// Microsoft documentation mentions only a NULL return value, but Khronos wiki says:
+	// "... some implementations will return other values. 1, 2, and 3 are used, as well as -1."
+	if (proc == (PROC) 1 || proc == (PROC) 2 || proc == (PROC) 3 || proc == (PROC) -1) {
 		return NULL;
 	}
 
@@ -1323,9 +1308,9 @@ bool winxOpen(int width, int height, const char* title) {
 		return false;
 	}
 
-	wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC) winxGetProc("wglChoosePixelFormatARB");
-	wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC) winxGetProc("wglCreateContextAttribsARB");
-	wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC) wglGetProcAddress("wglSwapIntervalEXT"); // optional
+	wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC) winxGetRequiredProc("wglChoosePixelFormatARB");
+	wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC) winxGetRequiredProc("wglCreateContextAttribsARB");
+	wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC) winxGetProcAddress("wglSwapIntervalEXT"); // optional
 
 	if (winxErrorMsg != NULL) {
 		// winxGetProc set the error message

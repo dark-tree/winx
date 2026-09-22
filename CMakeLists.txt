@@ -23,6 +23,6 @@ if(UNIX)
 	target_compile_options(winx PRIVATE -Wall -Wextra -Wno-unused-parameter)
 endif()
 
-if(WINX_BUILD_EXAMPLE)
+if(PROJECT_IS_TOP_LEVEL)
 	add_subdirectory(example)
 endif()

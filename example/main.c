@@ -21,7 +21,7 @@ int main() {
 	}
 
 	// use GLAD to load OpenGL functions
-	gladLoadGL();
+	gladLoadGLLoader(winxGetProcAddress);
 
 	// init OpenGL example
 	init();

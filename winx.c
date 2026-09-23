@@ -1031,6 +1031,10 @@ double winxGetTime() {
 typedef BOOL(WINAPI * PFNWGLCHOOSEPIXELFORMATARBPROC) (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats);
 typedef HGLRC(WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
 typedef BOOL(WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
+typedef HGLRC(WINAPI * PFN_wglCreateContext) (HDC hDC);
+typedef BOOL(WINAPI * PFN_wglMakeCurrent) (HDC hDC, HGLRC hShareContext);
+typedef BOOL(WINAPI * PFN_wglDeleteContext) (HGLRC hShareContext);
+typedef PROC(WINAPI * PFN_wglGetProcAddress) (LPCSTR name);
 
 #define WGL_SAMPLE_BUFFERS_ARB            0x2041
 #define WGL_SAMPLES_ARB                   0x2042
@@ -1077,6 +1081,9 @@ typedef struct {
 
 	// opengl loader
 	HANDLE opengl;
+	PFN_wglMakeCurrent wglMakeCurrent;
+	PFN_wglDeleteContext wglDeleteContext;
+	PFN_wglGetProcAddress wglGetProcAddress;
 
 	unsigned long long time;
 	bool capture;
@@ -1097,7 +1104,7 @@ void* winxGetProcAddress(const char* name) {
 		return NULL;
 	}
 
-	PROC proc = wglGetProcAddress(name);
+	PROC proc = winx->wglGetProcAddress(name);
 
 	// https://wikis.khronos.org/opengl/Load_OpenGL_Functions
 	// Microsoft documentation mentions only a NULL return value, but Khronos wiki says:
@@ -1223,6 +1230,11 @@ bool winxOpen(int width, int height, const char* title) {
 		return false;
 	}
 
+	PFN_wglCreateContext wglCreateContext = (PFN_wglCreateContext) GetProcAddress(winx->opengl, "wglCreateContext");
+	winx->wglMakeCurrent = (PFN_wglMakeCurrent) GetProcAddress(winx->opengl, "wglMakeCurrent");
+	winx->wglDeleteContext = (PFN_wglDeleteContext) GetProcAddress(winx->opengl, "wglDeleteContext");
+	winx->wglGetProcAddress = (PFN_wglGetProcAddress) GetProcAddress(winx->opengl, "wglGetProcAddress");
+
 	QueryPerformanceCounter((LARGE_INTEGER*) &winx->time);
 
 	HINSTANCE hinstance = GetModuleHandle(NULL);
@@ -1314,7 +1326,7 @@ bool winxOpen(int width, int height, const char* title) {
 	PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
 	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 
-	if (!wglMakeCurrent(fakeDeviceContext, fakeRenderContext)) {
+	if (!winx->wglMakeCurrent(fakeDeviceContext, fakeRenderContext)) {
 		winxErrorMsg = (char*) "wglMakeCurrent: Failed to select temporary context!";
 		return false;
 	}
@@ -1386,8 +1398,8 @@ bool winxOpen(int width, int height, const char* title) {
 	}
 
 	// close temporary window
-	wglMakeCurrent(fakeDeviceContext, NULL);
-	wglDeleteContext(fakeRenderContext);
+	winx->wglMakeCurrent(fakeDeviceContext, NULL);
+	winx->wglDeleteContext(fakeRenderContext);
 	ReleaseDC(fakeHndl, fakeDeviceContext);
 	DestroyWindow(fakeHndl);
 
@@ -1395,7 +1407,7 @@ bool winxOpen(int width, int height, const char* title) {
 	fakeRenderContext = NULL;
 	fakeHndl = NULL;
 
-	wglMakeCurrent(winx->device, winx->context);
+	winx->wglMakeCurrent(winx->device, winx->context);
 
 	// set vsync
 	winxSetVsync(__winx_hint_vsync);
@@ -1421,8 +1433,8 @@ void winxSwapBuffers() {
 }
 
 void winxClose() {
-	wglMakeCurrent(winx->device, NULL);
-	wglDeleteContext(winx->context);
+	winx->wglMakeCurrent(winx->device, NULL);
+	winx->wglDeleteContext(winx->context);
 	ReleaseDC(winx->hndl, winx->device);
 	DestroyWindow(winx->hndl);
 	FreeLibrary(winx->opengl);

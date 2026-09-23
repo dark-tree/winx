@@ -1075,6 +1075,9 @@ typedef struct {
 	HDC device;
 	HGLRC context;
 
+	// opengl loader
+	HANDLE opengl;
+
 	unsigned long long time;
 	bool capture;
 	WinxCursor* cursor_icon;
@@ -1099,8 +1102,10 @@ void* winxGetProcAddress(const char* name) {
 	// https://wikis.khronos.org/opengl/Load_OpenGL_Functions
 	// Microsoft documentation mentions only a NULL return value, but Khronos wiki says:
 	// "... some implementations will return other values. 1, 2, and 3 are used, as well as -1."
-	if (proc == (PROC) 1 || proc == (PROC) 2 || proc == (PROC) 3 || proc == (PROC) -1) {
-		return NULL;
+	if (proc == NULL || proc == (PROC) 1 || proc == (PROC) 2 || proc == (PROC) 3 || proc == (PROC) -1) {
+
+		// This one actually only returns NULL on error
+		return GetProcAddress(winx->opengl, name);
 	}
 
 	return (void*) proc;
@@ -1211,6 +1216,12 @@ static LRESULT CALLBACK winxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 bool winxOpen(int width, int height, const char* title) {
 	winx = (WinxHandle*) calloc(1, sizeof(WinxHandle));
 	winx->capture = false;
+
+	winx->opengl = LoadLibraryW(L"opengl32.dll");
+	if (!winx->opengl) {
+		winxErrorMsg = (char*) "LoadLibraryW: Failed to load opengl32.dll!";
+		return false;
+	}
 
 	QueryPerformanceCounter((LARGE_INTEGER*) &winx->time);
 
@@ -1414,6 +1425,7 @@ void winxClose() {
 	wglDeleteContext(winx->context);
 	ReleaseDC(winx->hndl, winx->device);
 	DestroyWindow(winx->hndl);
+	FreeLibrary(winx->opengl);
 
 	free(winx);
 	winx = NULL;

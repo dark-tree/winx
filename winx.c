@@ -665,6 +665,14 @@ static void* winxGetProc(const char* name) {
 	return NULL;
 }
 
+void* winxGetProcAddress(const char* name) {
+	if (name == NULL || glXGetProcAddress == NULL) {
+		return NULL;
+	}
+
+	return glXGetProcAddress(name);
+}
+
 static void winxUpdateCursorState(bool captured, WinxCursor* cursor) {
 	if (captured) {
 		unsigned int events = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
@@ -1093,6 +1101,24 @@ static PROC winxGetProc(LPCSTR name) {
 	}
 
 	return NULL;
+}
+
+void* winxGetProcAddress(const char* name) {
+	if (name == NULL)
+		return NULL;
+
+	PROC proc = wglGetProcAddress(name);
+	if (
+		proc == NULL ||
+		proc == (PROC) 1 ||
+		proc == (PROC) 2 ||
+		proc == (PROC) 3 ||
+		proc == (PROC) -1
+	) {
+		return NULL;
+	}
+
+	return (void*) proc;
 }
 
 static void winxUpdateCursorState(bool captured, WinxCursor* cursor) {
